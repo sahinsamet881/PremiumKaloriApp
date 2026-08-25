@@ -1,98 +1,104 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { useState } from 'react';
+import { ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import { CalorieRing } from '@/components/calorie-ring';
+import { MealRow } from '@/components/meal-row';
+import { QuickAddButton } from '@/components/quick-add-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+import { Colors } from '@/constants/theme';
+import { useColorScheme } from '@/hooks/use-color-scheme';
+import { Ogun } from '@/types';
 
-export default function HomeScreen() {
+const OGUNLER: Ogun[] = [
+  { id: '1', isim: 'Yulaf Ezmesi', kalori: 320, eklenmeSaati: '08:15' },
+  { id: '2', isim: 'Tavuklu Salata', kalori: 480, eklenmeSaati: '13:00' },
+  { id: '3', isim: '1 Fincan Kahve', kalori: 50, eklenmeSaati: '15:40' },
+];
+
+const GUNLUK_HEDEF_KALORI = 2500;
+
+export default function TodayScreen() {
+  const colorScheme = useColorScheme() ?? 'light';
+  const palette = Colors[colorScheme];
+  const [ogunler] = useState(OGUNLER);
+
+  const bugunAlinanKalori = ogunler.reduce((toplam, ogun) => toplam + ogun.kalori, 0);
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
+    <ThemedView style={styles.kok}>
+      <SafeAreaView style={styles.kok}>
+        <ScrollView
+          contentContainerStyle={styles.icerik}
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.cemberAlani}>
+            <CalorieRing
+              gunlukHedefKalori={GUNLUK_HEDEF_KALORI}
+              bugunAlinanKalori={bugunAlinanKalori}
             />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+            <ThemedText style={[styles.altBilgi, { color: palette.icon }]}>
+              {bugunAlinanKalori} / {GUNLUK_HEDEF_KALORI} kcal
+            </ThemedText>
+          </View>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+          <View style={styles.liste}>
+            <ThemedText style={styles.listeBasligi}>Bugünün Öğünleri</ThemedText>
+            {ogunler.length === 0 ? (
+              <ThemedText style={[styles.bosDurum, { color: palette.icon }]}>
+                Henüz bir şey eklenmedi
+              </ThemedText>
+            ) : (
+              ogunler.map((ogun, index) => (
+                <View
+                  key={ogun.id}
+                  style={
+                    index !== ogunler.length - 1
+                      ? { borderBottomColor: palette.icon, borderBottomWidth: StyleSheet.hairlineWidth }
+                      : undefined
+                  }>
+                  <MealRow {...ogun} />
+                </View>
+              ))
+            )}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+      <QuickAddButton />
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  kok: {
+    flex: 1,
+  },
+  icerik: {
+    paddingBottom: 140,
+  },
+  cemberAlani: {
     alignItems: 'center',
-    gap: 8,
+    paddingTop: 32,
+    paddingBottom: 24,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  altBilgi: {
+    fontSize: 14,
+    marginTop: 16,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  liste: {
+    paddingHorizontal: 24,
+  },
+  listeBasligi: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+    opacity: 0.5,
+  },
+  bosDurum: {
+    fontSize: 15,
+    paddingVertical: 24,
+    textAlign: 'center',
   },
 });

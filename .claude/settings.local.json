@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git rm *)",
+      "Bash(npx tsc *)",
+      "Bash(npx expo *)",
+      "Bash(echo \"exit code: $?\")"
+    ]
+  }
+}
