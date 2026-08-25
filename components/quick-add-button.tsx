@@ -1,12 +1,12 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { useAksanRenk } from '@/context/ThemeContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export function QuickAddButton() {
   const colorScheme = useColorScheme() ?? 'light';
-  const palette = Colors[colorScheme];
+  const { aksanTonlari } = useAksanRenk();
   const artiRengi = colorScheme === 'light' ? '#fff' : '#000';
 
   return (
@@ -14,8 +14,7 @@ export function QuickAddButton() {
       onPress={() => router.push('/modal')}
       style={({ pressed }) => [
         styles.buton,
-        { backgroundColor: palette.tint },
-        pressed && styles.butonBasili,
+        { backgroundColor: pressed ? aksanTonlari.koyu : aksanTonlari.orta },
       ]}>
       <Text style={[styles.arti, { color: artiRengi }]}>+</Text>
     </Pressable>
@@ -37,9 +36,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 10,
     elevation: 6,
-  },
-  butonBasili: {
-    opacity: 0.85,
   },
   arti: {
     fontSize: 36,

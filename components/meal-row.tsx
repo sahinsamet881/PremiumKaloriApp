@@ -1,18 +1,27 @@
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
+import { useVeri } from '@/context/DataContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ogun } from '@/types';
 
-export function MealRow({ isim, kalori, eklenmeSaati }: Ogun) {
+export function MealRow({ id, isim, kalori, eklenmeSaati }: Ogun) {
   const colorScheme = useColorScheme() ?? 'light';
   const palette = Colors[colorScheme];
+  const { ogunSil } = useVeri();
+
+  const silmeyiOnayla = () => {
+    Alert.alert('Öğünü Sil', 'Bu öğünü silmek istediğinize emin misiniz?', [
+      { text: 'İptal', style: 'cancel' },
+      { text: 'Sil', style: 'destructive', onPress: () => ogunSil(id) },
+    ]);
+  };
 
   return (
     <Pressable
       style={({ pressed }) => [styles.satir, pressed && styles.satirBasili]}
-      onPress={() => console.log('Öğüne tıklandı')}>
+      onPress={silmeyiOnayla}>
       <View>
         <ThemedText style={styles.isim}>{isim}</ThemedText>
         <ThemedText style={[styles.saat, { color: palette.icon }]}>{eklenmeSaati}</ThemedText>

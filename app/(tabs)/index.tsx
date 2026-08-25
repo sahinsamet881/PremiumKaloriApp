@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,23 +7,13 @@ import { QuickAddButton } from '@/components/quick-add-button';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
+import { useVeri } from '@/context/DataContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Ogun } from '@/types';
-
-const OGUNLER: Ogun[] = [
-  { id: '1', isim: 'Yulaf Ezmesi', kalori: 320, eklenmeSaati: '08:15' },
-  { id: '2', isim: 'Tavuklu Salata', kalori: 480, eklenmeSaati: '13:00' },
-  { id: '3', isim: '1 Fincan Kahve', kalori: 50, eklenmeSaati: '15:40' },
-];
-
-const GUNLUK_HEDEF_KALORI = 2500;
 
 export default function TodayScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const palette = Colors[colorScheme];
-  const [ogunler] = useState(OGUNLER);
-
-  const bugunAlinanKalori = ogunler.reduce((toplam, ogun) => toplam + ogun.kalori, 0);
+  const { kullanici, ogunler } = useVeri();
 
   return (
     <ThemedView style={styles.kok}>
@@ -33,12 +22,9 @@ export default function TodayScreen() {
           contentContainerStyle={styles.icerik}
           showsVerticalScrollIndicator={false}>
           <View style={styles.cemberAlani}>
-            <CalorieRing
-              gunlukHedefKalori={GUNLUK_HEDEF_KALORI}
-              bugunAlinanKalori={bugunAlinanKalori}
-            />
+            <CalorieRing />
             <ThemedText style={[styles.altBilgi, { color: palette.icon }]}>
-              {bugunAlinanKalori} / {GUNLUK_HEDEF_KALORI} kcal
+              {kullanici.bugunAlinanKalori} / {kullanici.gunlukHedefKalori} kcal
             </ThemedText>
           </View>
 

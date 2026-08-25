@@ -10,25 +10,23 @@ import Svg, { Circle } from 'react-native-svg';
 
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
+import { useVeri } from '@/context/DataContext';
+import { useAksanRenk } from '@/context/ThemeContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 type CalorieRingProps = {
-  gunlukHedefKalori: number;
-  bugunAlinanKalori: number;
   size?: number;
   strokeWidth?: number;
 };
 
-export function CalorieRing({
-  gunlukHedefKalori,
-  bugunAlinanKalori,
-  size = 280,
-  strokeWidth = 20,
-}: CalorieRingProps) {
+export function CalorieRing({ size = 280, strokeWidth = 20 }: CalorieRingProps) {
   const colorScheme = useColorScheme() ?? 'light';
   const palette = Colors[colorScheme];
+  const { aksanTonlari } = useAksanRenk();
+  const { kullanici } = useVeri();
+  const { gunlukHedefKalori, bugunAlinanKalori } = kullanici;
 
   const kalanKalori = gunlukHedefKalori - bugunAlinanKalori;
   const oran = gunlukHedefKalori > 0 ? bugunAlinanKalori / gunlukHedefKalori : 0;
@@ -57,16 +55,16 @@ export function CalorieRing({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={palette.icon}
+          stroke={aksanTonlari.acik}
           strokeWidth={strokeWidth}
-          strokeOpacity={0.15}
+          strokeOpacity={0.35}
           fill="none"
         />
         <AnimatedCircle
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={palette.tint}
+          stroke={aksanTonlari.orta}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           fill="none"
@@ -94,8 +92,11 @@ const styles = StyleSheet.create({
   },
   kalanSayi: {
     fontSize: 64,
+    lineHeight: 78,
     fontWeight: '700',
     letterSpacing: -1,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   etiket: {
     fontSize: 15,
