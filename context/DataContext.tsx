@@ -1,7 +1,27 @@
-import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { useNotifications } from '@/hooks/useNotifications';
 import { KullaniciVerisi, Ogun } from '@/types';
+
+const MS_CINSINDEN_GUN = 1000 * 60 * 60 * 24;
+
+function bugununTarihiUret() {
+  const simdi = new Date();
+  const yil = simdi.getFullYear();
+  const ay = String(simdi.getMonth() + 1).padStart(2, '0');
+  const gun = String(simdi.getDate()).padStart(2, '0');
+  return `${yil}-${ay}-${gun}`;
+}
+
+function tarihiGuneCevir(tarih: string) {
+  const [yil, ay, gun] = tarih.split('-').map(Number);
+  return new Date(yil, ay - 1, gun);
+}
+
+function gunFarkiHesapla(eskiTarih: string, yeniTarih: string) {
+  const fark = tarihiGuneCevir(yeniTarih).getTime() - tarihiGuneCevir(eskiTarih).getTime();
+  return Math.round(fark / MS_CINSINDEN_GUN);
+}
 
 type VeriBaglami = {
   kullanici: KullaniciVerisi;
@@ -31,6 +51,36 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [kullanici, setKullanici] = useState<KullaniciVerisi>(BASLANGIC_KULLANICISI);
   const [ogunler, setOgunler] = useState<Ogun[]>(BASLANGIC_OGUNLERI);
   const { hatirlaticiKur } = useNotifications();
+
+  useEffect(() => {
+    const bugun = bugununTarihiUret();
+    let ogunleriTemizle = false;
+
+    setKullanici((onceki) => {
+      if (!onceki.sonGirisTarihi) {
+        return { ...onceki, sonGirisTarihi: bugun };
+      }
+
+      const fark = gunFarkiHesapla(onceki.sonGirisTarihi, bugun);
+
+      if (fark <= 0) {
+        return onceki;
+      }
+
+      ogunleriTemizle = true;
+
+      return {
+        ...onceki,
+        bugunAlinanKalori: 0,
+        seriGunu: fark === 1 ? onceki.seriGunu + 1 : 0,
+        sonGirisTarihi: bugun,
+      };
+    });
+
+    if (ogunleriTemizle) {
+      setOgunler([]);
+    }
+  }, []);
 
   const hizliKaloriEkle = useCallback(
     (kalori: number, isim: string) => {

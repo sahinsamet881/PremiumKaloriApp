@@ -8,16 +8,26 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useVeri } from '@/context/DataContext';
+import { useAksanRenk } from '@/context/ThemeContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export default function TodayScreen() {
   const colorScheme = useColorScheme() ?? 'light';
   const palette = Colors[colorScheme];
   const { kullanici, ogunler } = useVeri();
+  const { aksanTonlari } = useAksanRenk();
 
   return (
     <ThemedView style={styles.kok}>
       <SafeAreaView style={styles.kok}>
+        <View style={styles.ustSatir}>
+          <View style={[styles.seriRozeti, { backgroundColor: aksanTonlari.acik }]}>
+            <ThemedText style={styles.seriEmoji}>🔥</ThemedText>
+            <ThemedText style={[styles.seriSayisi, { color: aksanTonlari.koyu }]}>
+              {kullanici.seriGunu}
+            </ThemedText>
+          </View>
+        </View>
         <ScrollView
           contentContainerStyle={styles.icerik}
           showsVerticalScrollIndicator={false}>
@@ -58,6 +68,27 @@ export default function TodayScreen() {
 const styles = StyleSheet.create({
   kok: {
     flex: 1,
+  },
+  ustSatir: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 24,
+    paddingTop: 8,
+  },
+  seriRozeti: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  seriEmoji: {
+    fontSize: 14,
+  },
+  seriSayisi: {
+    fontSize: 15,
+    fontWeight: '700',
   },
   icerik: {
     paddingBottom: 140,
