@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useCallback, useContext, useMemo, useState } from 'react';
 
+import { useNotifications } from '@/hooks/useNotifications';
 import { KullaniciVerisi, Ogun } from '@/types';
 
 type VeriBaglami = {
@@ -29,26 +30,31 @@ const BASLANGIC_KULLANICISI: KullaniciVerisi = {
 export function DataProvider({ children }: { children: ReactNode }) {
   const [kullanici, setKullanici] = useState<KullaniciVerisi>(BASLANGIC_KULLANICISI);
   const [ogunler, setOgunler] = useState<Ogun[]>(BASLANGIC_OGUNLERI);
+  const { hatirlaticiKur } = useNotifications();
 
-  const hizliKaloriEkle = useCallback((kalori: number, isim: string) => {
-    const simdi = new Date();
-    const saat = String(simdi.getHours()).padStart(2, '0');
-    const dakika = String(simdi.getMinutes()).padStart(2, '0');
-    const nihaiIsim = isim.trim().length > 0 ? isim.trim() : VARSAYILAN_OGUN_ISMI;
+  const hizliKaloriEkle = useCallback(
+    (kalori: number, isim: string) => {
+      const simdi = new Date();
+      const saat = String(simdi.getHours()).padStart(2, '0');
+      const dakika = String(simdi.getMinutes()).padStart(2, '0');
+      const nihaiIsim = isim.trim().length > 0 ? isim.trim() : VARSAYILAN_OGUN_ISMI;
 
-    const yeniOgun: Ogun = {
-      id: String(simdi.getTime()),
-      isim: nihaiIsim,
-      kalori,
-      eklenmeSaati: `${saat}:${dakika}`,
-    };
+      const yeniOgun: Ogun = {
+        id: String(simdi.getTime()),
+        isim: nihaiIsim,
+        kalori,
+        eklenmeSaati: `${saat}:${dakika}`,
+      };
 
-    setOgunler((oncekiler) => [...oncekiler, yeniOgun]);
-    setKullanici((onceki) => ({
-      ...onceki,
-      bugunAlinanKalori: onceki.bugunAlinanKalori + kalori,
-    }));
-  }, []);
+      setOgunler((oncekiler) => [...oncekiler, yeniOgun]);
+      setKullanici((onceki) => ({
+        ...onceki,
+        bugunAlinanKalori: onceki.bugunAlinanKalori + kalori,
+      }));
+      hatirlaticiKur();
+    },
+    [hatirlaticiKur]
+  );
 
   const ogunSil = useCallback(
     (id: string) => {
