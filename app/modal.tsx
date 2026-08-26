@@ -24,13 +24,8 @@ type HizliEkleSecenegi = {
   baslik: string;
   aciklama: string;
   ikon: 'bolt.fill' | 'star.fill' | 'magnifyingglass';
+  onSec: () => void;
 };
-
-const SECENEKLER: HizliEkleSecenegi[] = [
-  { id: 'hizliKalori', baslik: 'Hızlı Kalori', aciklama: 'Sadece bir sayı gir, geç', ikon: 'bolt.fill' },
-  { id: 'hazirButonlar', baslik: 'Hazır Butonlar', aciklama: 'Sık kullandığın besinlerden seç', ikon: 'star.fill' },
-  { id: 'yemekAra', baslik: 'Yemek Ara', aciklama: 'İsimle ara ve ekle', ikon: 'magnifyingglass' },
-];
 
 export default function ModalScreen() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -45,13 +40,29 @@ export default function ModalScreen() {
   const kaloriSayisi = Number(kaloriMetni);
   const gecerliMi = kaloriMetni.length > 0 && kaloriSayisi > 0;
 
-  const secenekSecildi = (secenek: HizliEkleSecenegi) => {
-    if (secenek.id === 'hizliKalori') {
-      setGorunum('hizliKalori');
-      return;
-    }
-    router.back();
-  };
+  const SECENEKLER: HizliEkleSecenegi[] = [
+    {
+      id: 'hizliKalori',
+      baslik: 'Hızlı Kalori',
+      aciklama: 'Sadece bir sayı gir, geç',
+      ikon: 'bolt.fill',
+      onSec: () => setGorunum('hizliKalori'),
+    },
+    {
+      id: 'hazirButonlar',
+      baslik: 'Hazır Butonlar',
+      aciklama: 'Sık kullandığın besinlerden seç',
+      ikon: 'star.fill',
+      onSec: () => router.back(),
+    },
+    {
+      id: 'yemekAra',
+      baslik: 'Yemek Ara',
+      aciklama: 'İsimle ara ve ekle',
+      ikon: 'magnifyingglass',
+      onSec: () => router.push('/search'),
+    },
+  ];
 
   const kaloriEkle = () => {
     if (!gecerliMi) {
@@ -124,7 +135,7 @@ export default function ModalScreen() {
         {SECENEKLER.map((secenek) => (
           <Pressable
             key={secenek.id}
-            onPress={() => secenekSecildi(secenek)}
+            onPress={secenek.onSec}
             style={({ pressed }) => [
               styles.kart,
               { borderColor: palette.icon },
