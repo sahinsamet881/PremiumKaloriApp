@@ -1,14 +1,10 @@
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { ALTIN, ALTIN_ORTA_SOLUK } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Ogun } from '@/types';
 
 export function MealRow({ id, isim, kalori, eklenmeSaati }: Ogun) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const palette = Colors[colorScheme];
   const { ogunSil } = useVeri();
 
   const silmeyiOnayla = () => {
@@ -23,10 +19,10 @@ export function MealRow({ id, isim, kalori, eklenmeSaati }: Ogun) {
       style={({ pressed }) => [styles.satir, pressed && styles.satirBasili]}
       onPress={silmeyiOnayla}>
       <View>
-        <ThemedText style={styles.isim}>{isim}</ThemedText>
-        <ThemedText style={[styles.saat, { color: palette.icon }]}>{eklenmeSaati}</ThemedText>
+        <Text style={styles.isim}>{isim}</Text>
+        <Text style={styles.saat}>{eklenmeSaati}</Text>
       </View>
-      <ThemedText style={styles.kalori}>{kalori} kcal</ThemedText>
+      <Text style={styles.kalori}>{kalori} kcal</Text>
     </Pressable>
   );
 }
@@ -36,21 +32,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: ALTIN,
+    borderRadius: 14,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginBottom: 12,
   },
   satirBasili: {
     opacity: 0.5,
   },
   isim: {
+    color: ALTIN,
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '300',
+    letterSpacing: 1,
   },
   saat: {
+    color: ALTIN_ORTA_SOLUK,
     fontSize: 13,
-    marginTop: 2,
+    fontWeight: '300',
+    letterSpacing: 0.5,
+    marginTop: 4,
   },
   kalori: {
+    color: ALTIN,
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '300',
+    letterSpacing: 1,
   },
 });

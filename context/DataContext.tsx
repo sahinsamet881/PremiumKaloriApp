@@ -1,7 +1,10 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { useNotifications } from '@/hooks/useNotifications';
-import { KullaniciVerisi, Ogun } from '@/types';
+import { KullaniciVerisi, Makrolar, Ogun, ProfilBilgisi } from '@/types';
+
+const KULLANICI_ANAHTARI = '@minimalist_kalori/kullanici';
 
 const MS_CINSINDEN_GUN = 1000 * 60 * 60 * 24;
 
@@ -26,8 +29,11 @@ function gunFarkiHesapla(eskiTarih: string, yeniTarih: string) {
 type VeriBaglami = {
   kullanici: KullaniciVerisi;
   ogunler: Ogun[];
-  hizliKaloriEkle: (kalori: number, isim: string) => void;
+  onboardingTamamlandi: boolean | null;
+  hizliKaloriEkle: (kalori: number, isim: string, makrolar?: Makrolar) => void;
   ogunSil: (id: string) => void;
+  profilKaydet: (profil: ProfilBilgisi) => void;
+  profilSifirla: () => void;
 };
 
 const VARSAYILAN_OGUN_ISMI = 'Hızlı Öğün';
@@ -41,49 +47,82 @@ const BASLANGIC_OGUNLERI: Ogun[] = [
 ];
 
 const BASLANGIC_KULLANICISI: KullaniciVerisi = {
+  isim: '',
+  yas: 0,
+  boy: 0,
+  kilo: 0,
+  hedefKilo: 0,
   gunlukHedefKalori: 2500,
   bugunAlinanKalori: BASLANGIC_OGUNLERI.reduce((toplam, ogun) => toplam + ogun.kalori, 0),
   seriGunu: 0,
   sonGirisTarihi: '',
+  makroHedefleri: { protein: 150, karbonhidrat: 275, yag: 80 },
 };
 
 export function DataProvider({ children }: { children: ReactNode }) {
   const [kullanici, setKullanici] = useState<KullaniciVerisi>(BASLANGIC_KULLANICISI);
   const [ogunler, setOgunler] = useState<Ogun[]>(BASLANGIC_OGUNLERI);
+  const [onboardingTamamlandi, setOnboardingTamamlandi] = useState<boolean | null>(null);
   const { hatirlaticiKur } = useNotifications();
 
   useEffect(() => {
-    const bugun = bugununTarihiUret();
-    let ogunleriTemizle = false;
+    const baslangicYukle = async () => {
+      const kayitliJson = await AsyncStorage.getItem(KULLANICI_ANAHTARI);
+      const bugun = bugununTarihiUret();
 
-    setKullanici((onceki) => {
-      if (!onceki.sonGirisTarihi) {
-        return { ...onceki, sonGirisTarihi: bugun };
+      if (!kayitliJson) {
+        setKullanici((onceki) => ({ ...onceki, sonGirisTarihi: bugun }));
+        setOnboardingTamamlandi(false);
+        return;
       }
 
-      const fark = gunFarkiHesapla(onceki.sonGirisTarihi, bugun);
+      const kayitliKullanici: KullaniciVerisi = JSON.parse(kayitliJson);
+
+      if (!kayitliKullanici.sonGirisTarihi) {
+        setKullanici({ ...kayitliKullanici, sonGirisTarihi: bugun });
+        setOnboardingTamamlandi(true);
+        return;
+      }
+
+      const fark = gunFarkiHesapla(kayitliKullanici.sonGirisTarihi, bugun);
 
       if (fark <= 0) {
-        return onceki;
+        setKullanici(kayitliKullanici);
+        setOnboardingTamamlandi(true);
+        return;
       }
 
-      ogunleriTemizle = true;
-
-      return {
-        ...onceki,
+      setKullanici({
+        ...kayitliKullanici,
         bugunAlinanKalori: 0,
-        seriGunu: fark === 1 ? onceki.seriGunu + 1 : 0,
+        seriGunu: fark === 1 ? kayitliKullanici.seriGunu + 1 : 0,
         sonGirisTarihi: bugun,
-      };
-    });
-
-    if (ogunleriTemizle) {
+      });
       setOgunler([]);
-    }
+      setOnboardingTamamlandi(true);
+    };
+
+    baslangicYukle();
+  }, []);
+
+  const profilKaydet = useCallback((profil: ProfilBilgisi) => {
+    setKullanici((onceki) => {
+      const guncellenmis: KullaniciVerisi = { ...onceki, ...profil };
+      AsyncStorage.setItem(KULLANICI_ANAHTARI, JSON.stringify(guncellenmis));
+      return guncellenmis;
+    });
+    setOnboardingTamamlandi(true);
+  }, []);
+
+  const profilSifirla = useCallback(() => {
+    AsyncStorage.removeItem(KULLANICI_ANAHTARI);
+    setKullanici(BASLANGIC_KULLANICISI);
+    setOgunler(BASLANGIC_OGUNLERI);
+    setOnboardingTamamlandi(false);
   }, []);
 
   const hizliKaloriEkle = useCallback(
-    (kalori: number, isim: string) => {
+    (kalori: number, isim: string, makrolar?: Makrolar) => {
       const simdi = new Date();
       const saat = String(simdi.getHours()).padStart(2, '0');
       const dakika = String(simdi.getMinutes()).padStart(2, '0');
@@ -94,6 +133,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
         isim: nihaiIsim,
         kalori,
         eklenmeSaati: `${saat}:${dakika}`,
+        makrolar,
       };
 
       setOgunler((oncekiler) => [...oncekiler, yeniOgun]);
@@ -123,8 +163,24 @@ export function DataProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<VeriBaglami>(
-    () => ({ kullanici, ogunler, hizliKaloriEkle, ogunSil }),
-    [kullanici, ogunler, hizliKaloriEkle, ogunSil]
+    () => ({
+      kullanici,
+      ogunler,
+      onboardingTamamlandi,
+      hizliKaloriEkle,
+      ogunSil,
+      profilKaydet,
+      profilSifirla,
+    }),
+    [
+      kullanici,
+      ogunler,
+      onboardingTamamlandi,
+      hizliKaloriEkle,
+      ogunSil,
+      profilKaydet,
+      profilSifirla,
+    ]
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

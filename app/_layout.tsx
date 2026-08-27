@@ -20,8 +20,15 @@ export default function RootLayout() {
         <NavigasyonTemasi value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Ekle' }} />
+            <Stack.Screen
+              name="modal"
+              options={{ presentation: 'modal', headerShown: false }}
+            />
             <Stack.Screen name="search" options={{ headerShown: false }} />
+            <Stack.Screen
+              name="onboarding"
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
           </Stack>
           <StatusBar style="auto" />
         </NavigasyonTemasi>

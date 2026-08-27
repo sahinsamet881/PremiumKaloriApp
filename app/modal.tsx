@@ -1,68 +1,76 @@
 import { router } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
 import {
+  Animated,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
   StyleSheet,
+  Text,
   TextInput,
   TouchableWithoutFeedback,
   View,
 } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Colors } from '@/constants/theme';
+import { ALTIN, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
-import { useAksanRenk } from '@/context/ThemeContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
-type HizliEkleSecenegi = {
-  id: 'hizliKalori' | 'hazirButonlar' | 'yemekAra';
+type IkonAdi = 'bolt.fill' | 'star.fill' | 'magnifyingglass';
+
+type LuksSecenekKartiProps = {
+  ikon: IkonAdi;
   baslik: string;
   aciklama: string;
-  ikon: 'bolt.fill' | 'star.fill' | 'magnifyingglass';
-  onSec: () => void;
+  onPress: () => void;
 };
 
+function LuksSecenekKarti({ ikon, baslik, aciklama, onPress }: LuksSecenekKartiProps) {
+  const doluluk = useRef(new Animated.Value(0)).current;
+
+  const basildi = () => {
+    Animated.timing(doluluk, { toValue: 1, duration: 220, useNativeDriver: false }).start();
+  };
+
+  const birakildi = () => {
+    Animated.timing(doluluk, { toValue: 0, duration: 320, useNativeDriver: false }).start();
+  };
+
+  const arkaPlanRengi = doluluk.interpolate({ inputRange: [0, 1], outputRange: [SIYAH, ALTIN] });
+  const metinRengi = doluluk.interpolate({ inputRange: [0, 1], outputRange: [ALTIN, SIYAH] });
+  const ikonSaydamlik = doluluk.interpolate({ inputRange: [0, 1], outputRange: [1, 0] });
+
+  return (
+    <Pressable onPress={onPress} onPressIn={basildi} onPressOut={birakildi}>
+      <Animated.View style={[stiller.kart, { backgroundColor: arkaPlanRengi }]}>
+        <Animated.View style={{ opacity: ikonSaydamlik }}>
+          <IconSymbol name={ikon} size={26} color={ALTIN} />
+        </Animated.View>
+        <View style={stiller.kartMetin}>
+          <Animated.Text style={[stiller.kartBaslik, { color: metinRengi }]}>
+            {baslik}
+          </Animated.Text>
+          <Animated.Text style={[stiller.kartAciklama, { color: metinRengi, opacity: 0.7 }]}>
+            {aciklama}
+          </Animated.Text>
+        </View>
+      </Animated.View>
+    </Pressable>
+  );
+}
+
 export default function ModalScreen() {
-  const colorScheme = useColorScheme() ?? 'light';
-  const palette = Colors[colorScheme];
-  const { aksanRengi } = useAksanRenk();
   const { hizliKaloriEkle } = useVeri();
   const [gorunum, setGorunum] = useState<'liste' | 'hizliKalori'>('liste');
   const [isimMetni, setIsimMetni] = useState('');
   const [kaloriMetni, setKaloriMetni] = useState('');
   const kaloriGirisiRef = useRef<TextInput>(null);
+  const ekleDoluluk = useRef(new Animated.Value(0)).current;
 
   const kaloriSayisi = Number(kaloriMetni);
   const gecerliMi = kaloriMetni.length > 0 && kaloriSayisi > 0;
-
-  const SECENEKLER: HizliEkleSecenegi[] = [
-    {
-      id: 'hizliKalori',
-      baslik: 'Hızlı Kalori',
-      aciklama: 'Sadece bir sayı gir, geç',
-      ikon: 'bolt.fill',
-      onSec: () => setGorunum('hizliKalori'),
-    },
-    {
-      id: 'hazirButonlar',
-      baslik: 'Hazır Butonlar',
-      aciklama: 'Sık kullandığın besinlerden seç',
-      ikon: 'star.fill',
-      onSec: () => router.back(),
-    },
-    {
-      id: 'yemekAra',
-      baslik: 'Yemek Ara',
-      aciklama: 'İsimle ara ve ekle',
-      ikon: 'magnifyingglass',
-      onSec: () => router.push('/search'),
-    },
-  ];
 
   const kaloriEkle = () => {
     if (!gecerliMi) {
@@ -72,19 +80,34 @@ export default function ModalScreen() {
     router.back();
   };
 
+  const ekleBasildi = () => {
+    if (!gecerliMi) {
+      return;
+    }
+    Animated.timing(ekleDoluluk, { toValue: 1, duration: 200, useNativeDriver: false }).start();
+  };
+
+  const ekleBirakildi = () => {
+    Animated.timing(ekleDoluluk, { toValue: 0, duration: 280, useNativeDriver: false }).start();
+  };
+
+  const ekleArkaPlani = ekleDoluluk.interpolate({ inputRange: [0, 1], outputRange: [SIYAH, ALTIN] });
+  const ekleMetinRengi = ekleDoluluk.interpolate({ inputRange: [0, 1], outputRange: [ALTIN, SIYAH] });
+
   if (gorunum === 'hizliKalori') {
     return (
       <KeyboardAvoidingView
-        style={styles.container}
+        style={stiller.container}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <ThemedView style={styles.container}>
-            <Pressable onPress={() => setGorunum('liste')} style={styles.geriButonu}>
-              <IconSymbol name="chevron.left" size={16} color={palette.icon} />
-              <ThemedText style={[styles.geriMetni, { color: palette.icon }]}>Geri</ThemedText>
+          <View style={stiller.container}>
+            <StatusBar style="light" />
+            <Pressable onPress={() => setGorunum('liste')} style={stiller.geriButonu}>
+              <IconSymbol name="chevron.left" size={16} color={ALTIN} />
+              <Text style={stiller.geriMetni}>Geri</Text>
             </Pressable>
 
-            <View style={styles.girisAlani}>
+            <View style={stiller.girisAlani}>
               <TextInput
                 autoFocus
                 value={isimMetni}
@@ -94,8 +117,9 @@ export default function ModalScreen() {
                 onSubmitEditing={() => kaloriGirisiRef.current?.focus()}
                 blurOnSubmit={false}
                 placeholder="Örn: Yulaf Ezmesi"
-                placeholderTextColor={palette.icon}
-                style={[styles.isimGirisi, { color: palette.text }]}
+                placeholderTextColor={ALTIN_SOLUK}
+                selectionColor={ALTIN}
+                style={stiller.isimGirisi}
               />
               <TextInput
                 ref={kaloriGirisiRef}
@@ -105,64 +129,71 @@ export default function ModalScreen() {
                 returnKeyType="done"
                 onSubmitEditing={kaloriEkle}
                 placeholder="0"
-                placeholderTextColor={palette.icon}
-                style={[styles.kaloriGirisi, { color: palette.text }]}
+                placeholderTextColor={ALTIN_SOLUK}
+                selectionColor={ALTIN}
+                style={stiller.kaloriGirisi}
               />
-              <ThemedText style={[styles.kaloriEtiketi, { color: palette.icon }]}>kcal</ThemedText>
+              <Text style={stiller.kaloriEtiketi}>kcal</Text>
             </View>
 
-            <Pressable
-              onPress={kaloriEkle}
-              disabled={!gecerliMi}
-              style={({ pressed }) => [
-                styles.ekleButonu,
-                { backgroundColor: aksanRengi, opacity: !gecerliMi ? 0.4 : pressed ? 0.85 : 1 },
-              ]}>
-              <ThemedText style={styles.ekleButonuMetni}>Ekle</ThemedText>
+            <Pressable onPress={kaloriEkle} onPressIn={ekleBasildi} onPressOut={ekleBirakildi}>
+              <Animated.View
+                style={[
+                  stiller.ekleButonu,
+                  { backgroundColor: ekleArkaPlani, opacity: gecerliMi ? 1 : 0.35 },
+                ]}>
+                <Animated.Text style={[stiller.ekleButonuMetni, { color: ekleMetinRengi }]}>
+                  Ekle
+                </Animated.Text>
+              </Animated.View>
             </Pressable>
-          </ThemedView>
+          </View>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
     );
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title" style={styles.baslik}>
-        Ekle
-      </ThemedText>
-      <View style={styles.liste}>
-        {SECENEKLER.map((secenek) => (
-          <Pressable
-            key={secenek.id}
-            onPress={secenek.onSec}
-            style={({ pressed }) => [
-              styles.kart,
-              { borderColor: palette.icon },
-              pressed && styles.kartBasili,
-            ]}>
-            <IconSymbol name={secenek.ikon} size={26} color={aksanRengi} />
-            <View style={styles.kartMetin}>
-              <ThemedText style={styles.kartBaslik}>{secenek.baslik}</ThemedText>
-              <ThemedText style={[styles.kartAciklama, { color: palette.icon }]}>
-                {secenek.aciklama}
-              </ThemedText>
-            </View>
-          </Pressable>
-        ))}
+    <View style={stiller.container}>
+      <StatusBar style="light" />
+      <Text style={stiller.baslik}>Ekle</Text>
+      <View style={stiller.liste}>
+        <LuksSecenekKarti
+          ikon="bolt.fill"
+          baslik="Hızlı Kalori"
+          aciklama="Sadece bir sayı gir, geç"
+          onPress={() => setGorunum('hizliKalori')}
+        />
+        <LuksSecenekKarti
+          ikon="star.fill"
+          baslik="Hazır Butonlar"
+          aciklama="Sık kullandığın besinlerden seç"
+          onPress={() => router.back()}
+        />
+        <LuksSecenekKarti
+          ikon="magnifyingglass"
+          baslik="Yemek Ara"
+          aciklama="İsimle ara ve ekle"
+          onPress={() => router.push('/search')}
+        />
       </View>
-    </ThemedView>
+    </View>
   );
 }
 
-const styles = StyleSheet.create({
+const stiller = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: SIYAH,
     padding: 24,
   },
   baslik: {
+    color: ALTIN,
+    fontSize: 28,
+    fontWeight: '300',
+    letterSpacing: 1.5,
     marginTop: 12,
-    marginBottom: 24,
+    marginBottom: 28,
   },
   liste: {
     gap: 12,
@@ -173,21 +204,22 @@ const styles = StyleSheet.create({
     gap: 16,
     padding: 18,
     borderRadius: 16,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  kartBasili: {
-    opacity: 0.5,
+    borderWidth: 1,
+    borderColor: ALTIN,
   },
   kartMetin: {
     flex: 1,
   },
   kartBaslik: {
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '300',
+    letterSpacing: 0.8,
   },
   kartAciklama: {
     fontSize: 13,
-    marginTop: 2,
+    fontWeight: '300',
+    marginTop: 3,
+    letterSpacing: 0.3,
   },
   geriButonu: {
     flexDirection: 'row',
@@ -196,7 +228,9 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   geriMetni: {
+    color: ALTIN,
     fontSize: 17,
+    fontWeight: '300',
   },
   girisAlani: {
     flex: 1,
@@ -204,32 +238,40 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   isimGirisi: {
+    color: ALTIN,
     fontSize: 20,
-    fontWeight: '500',
+    fontWeight: '300',
+    letterSpacing: 0.8,
     textAlign: 'center',
     marginBottom: 20,
   },
   kaloriGirisi: {
+    color: ALTIN,
     fontSize: 96,
-    fontWeight: '700',
-    letterSpacing: -2,
+    fontWeight: '300',
+    letterSpacing: -1,
     textAlign: 'center',
     minWidth: 160,
   },
   kaloriEtiketi: {
+    color: ALTIN_SOLUK,
     fontSize: 17,
+    fontWeight: '300',
     marginTop: 4,
+    letterSpacing: 1,
   },
   ekleButonu: {
     height: 56,
     borderRadius: 28,
+    borderWidth: 1,
+    borderColor: ALTIN,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
   },
   ekleButonuMetni: {
-    color: '#fff',
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '400',
+    letterSpacing: 1,
   },
 });

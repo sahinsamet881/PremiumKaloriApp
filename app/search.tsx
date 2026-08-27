@@ -1,135 +1,51 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Image } from 'expo-image';
+import { StatusBar } from 'expo-status-bar';
+import { useMemo, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Colors } from '@/constants/theme';
+import { ALTIN, ALTIN_ORTA_SOLUK, ALTIN_PLACEHOLDER, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
-import { useAksanRenk } from '@/context/ThemeContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-const EDAMAM_APP_ID = '62ec739e';
-const EDAMAM_APP_KEY = '96cdf0a39f1e00f89c74e2f2fa90a0f1';
-
-type EdamamBesin = {
-  foodId: string;
-  label: string;
-  nutrients: {
-    ENERC_KCAL?: number;
-  };
-};
-
-type EdamamYaniti = {
-  hints?: { food: EdamamBesin }[];
-};
-
-type MyMemoryYaniti = {
-  responseData?: {
-    translatedText?: string;
-  };
-};
-
-const MAKSIMUM_SONUC_SAYISI = 10;
-
-function besinleriTemizle(hints: { food: EdamamBesin }[]) {
-  const gorulenIsimler = new Set<string>();
-  const temizler: EdamamBesin[] = [];
-
-  for (const ipucu of hints) {
-    const besin = ipucu.food;
-    const kalori = besin.nutrients.ENERC_KCAL ?? 0;
-    const isimAnahtari = besin.label.trim().toLowerCase();
-
-    if (kalori <= 0 || gorulenIsimler.has(isimAnahtari)) {
-      continue;
-    }
-
-    gorulenIsimler.add(isimAnahtari);
-    temizler.push(besin);
-
-    if (temizler.length === MAKSIMUM_SONUC_SAYISI) {
-      break;
-    }
-  }
-
-  return temizler;
-}
+import { YerelBesin, YEREL_BESIN_VERITABANI } from '@/data/foodDatabase';
 
 export default function SearchScreen() {
-  const colorScheme = useColorScheme() ?? 'light';
-  const palette = Colors[colorScheme];
-  const { aksanRengi } = useAksanRenk();
   const { hizliKaloriEkle } = useVeri();
 
   const [sorgu, setSorgu] = useState('');
-  const [sonuclar, setSonuclar] = useState<EdamamBesin[]>([]);
-  const [yukleniyor, setYukleniyor] = useState(false);
-  const [aramaYapildi, setAramaYapildi] = useState(false);
-  const [hataOldu, setHataOldu] = useState(false);
 
-  useEffect(() => {
-    const sorguTemiz = sorgu.trim();
+  const sonuclar = useMemo(() => {
+    const sorguTemiz = sorgu.trim().toLocaleLowerCase('tr-TR');
 
-    if (sorguTemiz.length < 2) {
-      setSonuclar([]);
-      setAramaYapildi(false);
-      setYukleniyor(false);
-      setHataOldu(false);
-      return;
+    if (sorguTemiz.length === 0) {
+      return [];
     }
 
-    setYukleniyor(true);
-
-    const zamanlayici = setTimeout(async () => {
-      try {
-        const ceviriYaniti = await fetch(
-          `https://api.mymemory.translated.net/get?q=${encodeURIComponent(sorguTemiz)}&langpair=tr|en`
-        );
-        const ceviriVeri: MyMemoryYaniti = await ceviriYaniti.json();
-        const ingilizceSorgu = ceviriVeri.responseData?.translatedText?.trim() || sorguTemiz;
-
-        const yanit = await fetch(
-          `https://api.edamam.com/api/food-database/v2/parser?app_id=${EDAMAM_APP_ID}&app_key=${EDAMAM_APP_KEY}&ingr=${encodeURIComponent(ingilizceSorgu)}`
-        );
-        const veri: EdamamYaniti = await yanit.json();
-        setSonuclar(besinleriTemizle(veri.hints ?? []));
-        setHataOldu(false);
-      } catch {
-        setSonuclar([]);
-        setHataOldu(true);
-      } finally {
-        setYukleniyor(false);
-        setAramaYapildi(true);
-      }
-    }, 500);
-
-    return () => clearTimeout(zamanlayici);
+    return YEREL_BESIN_VERITABANI.filter((besin) =>
+      besin.isim.toLocaleLowerCase('tr-TR').includes(sorguTemiz)
+    );
   }, [sorgu]);
 
-  const besinSecildi = (besin: EdamamBesin) => {
-    const kalori = Math.round(besin.nutrients.ENERC_KCAL ?? 0);
-    hizliKaloriEkle(kalori, besin.label);
+  const besinSecildi = (besin: YerelBesin) => {
+    hizliKaloriEkle(besin.kalori, besin.isim, {
+      protein: besin.protein,
+      karbonhidrat: besin.karbonhidrat,
+      yag: besin.yag,
+      porsiyon: besin.porsiyon,
+    });
     router.push('/');
   };
 
   return (
-    <ThemedView style={styles.container}>
+    <View style={styles.container}>
+      <StatusBar style="light" />
       <Pressable onPress={() => router.back()} style={styles.geriButonu}>
-        <IconSymbol name="chevron.left" size={16} color={palette.icon} />
-        <ThemedText style={[styles.geriMetni, { color: palette.icon }]}>Geri</ThemedText>
+        <IconSymbol name="chevron.left" size={16} color={ALTIN} />
+        <Text style={styles.geriMetni}>Geri</Text>
       </Pressable>
 
-      <View style={[styles.aramaCubugu, { backgroundColor: palette.icon + '1a' }]}>
-        <IconSymbol name="magnifyingglass" size={18} color={palette.icon} />
+      <View style={styles.aramaCubugu}>
+        <IconSymbol name="magnifyingglass" size={18} color={ALTIN} />
         <TextInput
           autoFocus
           value={sorgu}
@@ -137,58 +53,64 @@ export default function SearchScreen() {
           keyboardType="default"
           returnKeyType="search"
           placeholder="Ne yedin?"
-          placeholderTextColor={palette.icon}
-          style={[styles.aramaGirisi, { color: palette.text }]}
+          placeholderTextColor={ALTIN_SOLUK}
+          selectionColor={ALTIN}
+          style={styles.aramaGirisi}
         />
       </View>
 
-      {yukleniyor ? (
-        <View style={styles.durumGostergesi}>
-          <ActivityIndicator color={aksanRengi} />
-          <ThemedText style={[styles.durumMetni, { color: palette.icon }]}>
-            Çevriliyor ve aranıyor...
-          </ThemedText>
-        </View>
-      ) : hataOldu ? (
-        <ThemedText style={[styles.durumMetni, styles.bagimsizDurumMetni, { color: palette.icon }]}>
-          Arama sırasında bir sorun oluştu, tekrar dene.
-        </ThemedText>
-      ) : aramaYapildi && sonuclar.length === 0 ? (
-        <ThemedText style={[styles.durumMetni, styles.bagimsizDurumMetni, { color: palette.icon }]}>
-          {`"${sorgu}" için sonuç bulunamadı`}
-        </ThemedText>
-      ) : !aramaYapildi ? (
-        <ThemedText style={[styles.durumMetni, styles.bagimsizDurumMetni, { color: palette.icon }]}>
-          Aramaya başlamak için yaz
-        </ThemedText>
+      {sorgu.trim().length === 0 ? (
+        <Text style={styles.durumMetni}>Aramaya başlamak için yaz</Text>
+      ) : sonuclar.length === 0 ? (
+        <Text style={styles.durumMetni}>{`"${sorgu}" için sonuç bulunamadı`}</Text>
       ) : (
         <FlatList
           data={sonuclar}
-          keyExtractor={(besin, index) => `${besin.foodId}-${index}`}
+          keyExtractor={(besin) => besin.id}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.sonucListesi}
-          ItemSeparatorComponent={() => (
-            <View style={[styles.ayirac, { backgroundColor: palette.icon }]} />
-          )}
+          ItemSeparatorComponent={() => <View style={styles.ayirac} />}
           renderItem={({ item }) => (
             <Pressable
               onPress={() => besinSecildi(item)}
               style={({ pressed }) => [styles.sonucSatiri, pressed && styles.sonucSatiriBasili]}>
-              <ThemedText style={styles.sonucIsmi}>{item.label}</ThemedText>
-              <ThemedText style={[styles.sonucKalorisi, { color: palette.icon }]}>
-                {Math.round(item.nutrients.ENERC_KCAL ?? 0)} kcal
-              </ThemedText>
+              <View style={styles.gorselGolgesi}>
+                <View style={styles.gorselKapsayici}>
+                  {item.imageUrl ? (
+                    <Image
+                      source={{ uri: item.imageUrl }}
+                      style={styles.gorsel}
+                      contentFit="cover"
+                      transition={200}
+                      onError={(hata) =>
+                        console.log(`Görsel yüklenemedi: ${item.isim}`, hata.error)
+                      }
+                    />
+                  ) : null}
+                </View>
+              </View>
+              <View style={styles.sonucBilgisi}>
+                <Text style={styles.sonucIsmi}>{item.isim}</Text>
+                <View style={styles.sonucAltSatir}>
+                  <Text style={styles.sonucPorsiyonu}>{item.porsiyon}</Text>
+                  <Text style={styles.sonucKalorisi}>{item.kalori} kcal</Text>
+                </View>
+                <Text style={styles.sonucMakrolari}>
+                  {`P: ${item.protein}g   K: ${item.karbonhidrat}g   Y: ${item.yag}g`}
+                </Text>
+              </View>
             </Pressable>
           )}
         />
       )}
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: SIYAH,
     paddingTop: 60,
     paddingHorizontal: 24,
   },
@@ -200,31 +122,34 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   geriMetni: {
+    color: ALTIN,
     fontSize: 17,
+    fontWeight: '300',
   },
   aramaCubugu: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    height: 44,
+    height: 48,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ALTIN,
     paddingHorizontal: 14,
   },
   aramaGirisi: {
     flex: 1,
+    color: ALTIN,
     fontSize: 17,
-  },
-  durumGostergesi: {
-    alignItems: 'center',
-    marginTop: 48,
+    fontWeight: '300',
+    letterSpacing: 0.5,
   },
   durumMetni: {
+    color: ALTIN_ORTA_SOLUK,
     fontSize: 15,
+    fontWeight: '300',
     textAlign: 'center',
-    marginTop: 12,
-  },
-  bagimsizDurumMetni: {
     marginTop: 48,
+    letterSpacing: 0.5,
   },
   sonucListesi: {
     paddingTop: 20,
@@ -232,26 +157,70 @@ const styles = StyleSheet.create({
   },
   ayirac: {
     height: StyleSheet.hairlineWidth,
-    opacity: 0.3,
+    backgroundColor: ALTIN_SOLUK,
   },
   sonucSatiri: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 16,
+    paddingVertical: 14,
+    gap: 14,
   },
   sonucSatiriBasili: {
     opacity: 0.5,
   },
+  gorselGolgesi: {
+    width: 60,
+    height: 60,
+    borderRadius: 12,
+    shadowColor: ALTIN,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  gorselKapsayici: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ALTIN,
+    overflow: 'hidden',
+    backgroundColor: ALTIN_PLACEHOLDER,
+  },
+  gorsel: {
+    width: 60,
+    height: 60,
+  },
+  sonucBilgisi: {
+    flex: 1,
+    gap: 4,
+  },
   sonucIsmi: {
-    fontSize: 17,
-    fontWeight: '500',
-    flexShrink: 1,
-    paddingRight: 12,
-    textTransform: 'capitalize',
+    color: ALTIN,
+    fontSize: 18,
+    fontWeight: '300',
+    letterSpacing: 1,
+  },
+  sonucAltSatir: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  sonucPorsiyonu: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 14,
+    fontWeight: '300',
+    letterSpacing: 0.5,
+  },
+  sonucMakrolari: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 13,
+    fontWeight: '300',
+    letterSpacing: 0.3,
   },
   sonucKalorisi: {
-    fontSize: 15,
-    fontWeight: '600',
+    color: ALTIN,
+    fontSize: 16,
+    fontWeight: '400',
+    letterSpacing: 0.5,
   },
 });

@@ -1,22 +1,14 @@
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text } from 'react-native';
 
-import { useAksanRenk } from '@/context/ThemeContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { ALTIN, SIYAH } from '@/constants/luxTheme';
 
 export function QuickAddButton() {
-  const colorScheme = useColorScheme() ?? 'light';
-  const { aksanTonlari } = useAksanRenk();
-  const artiRengi = colorScheme === 'light' ? '#fff' : '#000';
-
   return (
     <Pressable
       onPress={() => router.push('/modal')}
-      style={({ pressed }) => [
-        styles.buton,
-        { backgroundColor: pressed ? aksanTonlari.koyu : aksanTonlari.orta },
-      ]}>
-      <Text style={[styles.arti, { color: artiRengi }]}>+</Text>
+      style={({ pressed }) => [styles.buton, pressed && styles.butonBasili]}>
+      <Text style={styles.arti}>+</Text>
     </Pressable>
   );
 }
@@ -31,15 +23,20 @@ const styles = StyleSheet.create({
     borderRadius: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 6,
+    backgroundColor: ALTIN,
+    shadowColor: ALTIN,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 14,
+    elevation: 10,
+  },
+  butonBasili: {
+    opacity: 0.85,
   },
   arti: {
+    color: SIYAH,
     fontSize: 36,
-    fontWeight: '400',
+    fontWeight: '300',
     lineHeight: 40,
   },
 });

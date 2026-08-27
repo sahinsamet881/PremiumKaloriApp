@@ -4,7 +4,10 @@
       "Bash(git rm *)",
       "Bash(npx tsc *)",
       "Bash(npx expo *)",
-      "Bash(echo \"exit code: $?\")"
+      "Bash(echo \"exit code: $?\")",
+      "WebSearch",
+      "WebFetch(domain:unsplash.com)",
+      "Bash(echo \"exit: $?\")"
     ]
   }
 }

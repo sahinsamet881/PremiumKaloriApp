@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedProps,
@@ -8,11 +8,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import Svg, { Circle } from 'react-native-svg';
 
-import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
+import { ALTIN, ALTIN_ORTA_SOLUK } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
-import { useAksanRenk } from '@/context/ThemeContext';
-import { useColorScheme } from '@/hooks/use-color-scheme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
@@ -22,9 +19,6 @@ type CalorieRingProps = {
 };
 
 export function CalorieRing({ size = 280, strokeWidth = 20 }: CalorieRingProps) {
-  const colorScheme = useColorScheme() ?? 'light';
-  const palette = Colors[colorScheme];
-  const { aksanTonlari } = useAksanRenk();
   const { kullanici } = useVeri();
   const { gunlukHedefKalori, bugunAlinanKalori } = kullanici;
 
@@ -55,16 +49,16 @@ export function CalorieRing({ size = 280, strokeWidth = 20 }: CalorieRingProps) 
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={aksanTonlari.acik}
+          stroke={ALTIN}
           strokeWidth={strokeWidth}
-          strokeOpacity={0.35}
+          strokeOpacity={0.18}
           fill="none"
         />
         <AnimatedCircle
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={aksanTonlari.orta}
+          stroke={ALTIN}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           fill="none"
@@ -73,8 +67,8 @@ export function CalorieRing({ size = 280, strokeWidth = 20 }: CalorieRingProps) 
         />
       </Svg>
       <View style={styles.merkez}>
-        <ThemedText style={styles.kalanSayi}>{Math.round(kalanKalori)}</ThemedText>
-        <ThemedText style={[styles.etiket, { color: palette.icon }]}>kalori kaldı</ThemedText>
+        <Text style={styles.kalanSayi}>{Math.round(kalanKalori)}</Text>
+        <Text style={styles.etiket}>kalori kaldı</Text>
       </View>
     </View>
   );
@@ -91,15 +85,19 @@ const styles = StyleSheet.create({
     pointerEvents: 'none',
   },
   kalanSayi: {
+    color: ALTIN,
     fontSize: 64,
     lineHeight: 78,
-    fontWeight: '700',
+    fontWeight: '600',
     letterSpacing: -1,
     includeFontPadding: false,
     textAlignVertical: 'center',
   },
   etiket: {
+    color: ALTIN_ORTA_SOLUK,
     fontSize: 15,
+    fontWeight: '300',
+    letterSpacing: 1,
     marginTop: 4,
   },
 });
