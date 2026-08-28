@@ -1,13 +1,10 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { AKSAN_PALETLERI, AksanRengiAdi } from '@/constants/theme';
 import { ALTIN, ALTIN_COK_SOLUK, ALTIN_ORTA_SOLUK, SIYAH } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
-import { useAksanRenk } from '@/context/ThemeContext';
-
-const AKSAN_SIRASI: AksanRengiAdi[] = ['mavi', 'kirmizi', 'turuncu', 'yesil'];
 
 type ProfilKartiProps = {
   etiket: string;
@@ -27,18 +24,69 @@ function ProfilKarti({ etiket, deger, genis, vurgulu }: ProfilKartiProps) {
   );
 }
 
+type LuksToggleProps = {
+  etiket: string;
+  aciklama: string;
+  deger: boolean;
+  onDegisti: (deger: boolean) => void;
+};
+
+function LuksToggle({ etiket, aciklama, deger, onDegisti }: LuksToggleProps) {
+  const konum = useRef(new Animated.Value(deger ? 1 : 0)).current;
+
+  const degistir = () => {
+    const yeniDeger = !deger;
+    Animated.spring(konum, { toValue: yeniDeger ? 1 : 0, useNativeDriver: true, friction: 6 }).start();
+    onDegisti(yeniDeger);
+  };
+
+  const cevirX = konum.interpolate({ inputRange: [0, 1], outputRange: [2, 22] });
+
+  return (
+    <Pressable onPress={degistir} style={stiller.toggleSatiri}>
+      <View style={stiller.toggleMetinAlani}>
+        <Text style={stiller.toggleEtiket}>{etiket}</Text>
+        <Text style={stiller.toggleAciklama}>{aciklama}</Text>
+      </View>
+      <View style={[stiller.togglePist, deger ? stiller.togglePistAktif : null]}>
+        <Animated.View style={[stiller.toggleTopu, { transform: [{ translateX: cevirX }] }]} />
+      </View>
+    </Pressable>
+  );
+}
+
 export default function SettingsScreen() {
-  const { aksanAdi, aksanSec } = useAksanRenk();
   const { kullanici } = useVeri();
+  const [suHatirlaticisi, setSuHatirlaticisi] = useState(true);
+  const [ogunHatirlaticisi, setOgunHatirlaticisi] = useState(true);
 
   const isim = kullanici.isim.trim().length > 0 ? kullanici.isim.trim() : '—';
+
+  const iletisimeGec = () => {
+    Alert.alert('Geliştirici Ekibi', 'Mesajın bize ulaştı sayılır, çok yakında buradayız!');
+  };
+
+  const premiumaGec = () => {
+    Alert.alert('Çok Yakında', 'Premium deneyim kapıda, sabırsızlanıyoruz!');
+  };
 
   return (
     <ScrollView style={stiller.container} contentContainerStyle={stiller.icerik}>
       <StatusBar style="light" />
-      <Text style={stiller.baslik}>Ayarlar</Text>
+      <View style={stiller.ustBaslikSatiri}>
+        <MaterialCommunityIcons name="crown-outline" size={26} color={ALTIN} />
+        <Text style={stiller.baslik}>VIP Profil</Text>
+      </View>
 
-      <Text style={stiller.bolumBasligi}>Profilim</Text>
+      <Pressable onPress={premiumaGec} style={stiller.vipLoungeKarti}>
+        <MaterialCommunityIcons name="crown" size={40} color={SIYAH} />
+        <Text style={stiller.vipLoungeBasligi}>VIP Lounge</Text>
+        <Text style={stiller.vipLoungeAciklamasi}>
+          Sınırsız AI Lens ve Gelişmiş Analizler için Premium&apos;a Geç
+        </Text>
+      </Pressable>
+
+      <Text style={stiller.bolumBasligi}>Kişisel Verilerim</Text>
       <View style={stiller.profilIzgarasi}>
         <ProfilKarti etiket="İsim" deger={isim} genis />
         <ProfilKarti etiket="Yaş" deger={`${kullanici.yas}`} />
@@ -53,28 +101,37 @@ export default function SettingsScreen() {
         />
       </View>
 
-      <Text style={stiller.bolumBasligi}>Vurgu Rengi</Text>
-      <View style={stiller.renkSirasi}>
-        {AKSAN_SIRASI.map((secenek) => {
-          const secili = secenek === aksanAdi;
-          return (
-            <Pressable
-              key={secenek}
-              onPress={() => aksanSec(secenek)}
-              accessibilityRole="button"
-              accessibilityLabel={secenek}
-              accessibilityState={{ selected: secili }}
-              style={({ pressed }) => [
-                stiller.renkDugmesi,
-                { backgroundColor: AKSAN_PALETLERI[secenek].orta },
-                secili ? stiller.renkDugmesiSecili : null,
-                pressed ? stiller.renkDugmesiBasili : null,
-              ]}>
-              {secili ? <IconSymbol name="checkmark" size={20} color={SIYAH} /> : null}
-            </Pressable>
-          );
-        })}
+      <Text style={stiller.bolumBasligi}>Hatırlatıcılar</Text>
+      <View style={stiller.hatirlaticiKarti}>
+        <LuksToggle
+          etiket="Su İçme Hatırlatıcısı"
+          aciklama="Günün boyunca nazikçe dürtelim"
+          deger={suHatirlaticisi}
+          onDegisti={setSuHatirlaticisi}
+        />
+        <View style={stiller.toggleAyraci} />
+        <LuksToggle
+          etiket="Öğün Hatırlatıcısı"
+          aciklama="Bir öğün unutulmasın diye"
+          deger={ogunHatirlaticisi}
+          onDegisti={setOgunHatirlaticisi}
+        />
       </View>
+
+      <Text style={stiller.bolumBasligi}>Destek</Text>
+      <Pressable onPress={iletisimeGec} style={stiller.iletisimSatiri}>
+        <MaterialCommunityIcons name="headset" size={22} color={ALTIN} />
+        <View style={stiller.iletisimMetinAlani}>
+          <Text style={stiller.iletisimBasligi}>Geliştirici Ekibiyle İletişim</Text>
+          <Text style={stiller.iletisimAciklamasi}>Bir fikrin veya sorunun mu var?</Text>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={22} color={ALTIN_ORTA_SOLUK} />
+      </Pressable>
+
+      <Pressable onPress={premiumaGec} style={stiller.premiumButonu}>
+        <MaterialCommunityIcons name="star-four-points" size={20} color={SIYAH} />
+        <Text style={stiller.premiumButonuYazisi}>Premium&apos;a Geç</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -89,12 +146,17 @@ const stiller = StyleSheet.create({
     paddingTop: 80,
     paddingBottom: 60,
   },
+  ustBaslikSatiri: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 32,
+  },
   baslik: {
     color: ALTIN,
-    fontSize: 28,
-    fontWeight: '300',
-    letterSpacing: 1.5,
-    marginBottom: 32,
+    fontFamily: 'StoriesGrand',
+    fontSize: 30,
+    letterSpacing: 1,
   },
   bolumBasligi: {
     color: ALTIN_ORTA_SOLUK,
@@ -103,12 +165,42 @@ const stiller = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 1.5,
     marginBottom: 16,
+    marginTop: 8,
+  },
+  vipLoungeKarti: {
+    alignItems: 'center',
+    backgroundColor: ALTIN,
+    borderRadius: 24,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
+    marginBottom: 36,
+    gap: 8,
+    shadowColor: ALTIN,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.7,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  vipLoungeBasligi: {
+    color: SIYAH,
+    fontFamily: 'StoriesGrand',
+    fontSize: 28,
+    letterSpacing: 1,
+    marginTop: 4,
+  },
+  vipLoungeAciklamasi: {
+    color: SIYAH,
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
+    letterSpacing: 0.3,
+    marginTop: 4,
   },
   profilIzgarasi: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 40,
+    marginBottom: 32,
   },
   profilKarti: {
     borderWidth: 1,
@@ -142,24 +234,104 @@ const stiller = StyleSheet.create({
   profilKartiDegerVurgulu: {
     fontSize: 26,
   },
-  renkSirasi: {
-    flexDirection: 'row',
-    gap: 20,
+  hatirlaticiKarti: {
+    borderWidth: 1,
+    borderColor: ALTIN,
+    backgroundColor: 'rgba(10,11,16,0.6)',
+    borderRadius: 16,
+    paddingHorizontal: 18,
+    marginBottom: 32,
   },
-  renkDugmesi: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  toggleSatiri: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+  },
+  toggleAyraci: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: ALTIN_COK_SOLUK,
+  },
+  toggleMetinAlani: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  toggleEtiket: {
+    color: ALTIN,
+    fontSize: 15,
+    fontWeight: '400',
+    letterSpacing: 0.3,
+  },
+  toggleAciklama: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 12,
+    fontWeight: '300',
+    marginTop: 3,
+  },
+  togglePist: {
+    width: 44,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: ALTIN_COK_SOLUK,
+    backgroundColor: SIYAH,
+    justifyContent: 'center',
   },
-  renkDugmesiSecili: {
+  togglePistAktif: {
     borderColor: ALTIN,
-    borderWidth: 2,
+    backgroundColor: 'rgba(232,195,124,0.25)',
   },
-  renkDugmesiBasili: {
-    opacity: 0.7,
+  toggleTopu: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: ALTIN,
+  },
+  iletisimSatiri: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderWidth: 1,
+    borderColor: ALTIN,
+    backgroundColor: 'rgba(10,11,16,0.6)',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 18,
+    marginBottom: 40,
+  },
+  iletisimMetinAlani: {
+    flex: 1,
+  },
+  iletisimBasligi: {
+    color: ALTIN,
+    fontSize: 15,
+    fontWeight: '400',
+    letterSpacing: 0.3,
+  },
+  iletisimAciklamasi: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 12,
+    fontWeight: '300',
+    marginTop: 3,
+  },
+  premiumButonu: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: ALTIN,
+    shadowColor: ALTIN,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  premiumButonuYazisi: {
+    color: SIYAH,
+    fontSize: 17,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
 });

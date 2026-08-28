@@ -67,8 +67,10 @@ export function CalorieRing({ size = 280, strokeWidth = 20 }: CalorieRingProps) 
         />
       </Svg>
       <View style={styles.merkez}>
-        <Text style={styles.kalanSayi}>{Math.round(kalanKalori)}</Text>
-        <Text style={styles.etiket}>kalori kaldı</Text>
+        <Text style={[styles.kalanSayi, { fontSize: size * 0.229, lineHeight: size * 0.279 }]}>
+          {Math.round(kalanKalori)}
+        </Text>
+        <Text style={[styles.etiket, { fontSize: size * 0.054 }]}>kalori kaldı</Text>
       </View>
     </View>
   );
@@ -86,8 +88,6 @@ const styles = StyleSheet.create({
   },
   kalanSayi: {
     color: ALTIN,
-    fontSize: 64,
-    lineHeight: 78,
     fontWeight: '600',
     letterSpacing: -1,
     includeFontPadding: false,
@@ -95,7 +95,6 @@ const styles = StyleSheet.create({
   },
   etiket: {
     color: ALTIN_ORTA_SOLUK,
-    fontSize: 15,
     fontWeight: '300',
     letterSpacing: 1,
     marginTop: 4,

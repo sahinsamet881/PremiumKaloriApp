@@ -1,17 +1,20 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ComponentProps, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Animated,
   Easing,
   Keyboard,
   KeyboardAvoidingView,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
+  Text,
   TextInput,
   TouchableWithoutFeedback,
   View,
@@ -28,6 +31,7 @@ type AktiviteDuzeyi = 'sedanter' | 'azAktif' | 'orta' | 'aktif' | 'cokAktif';
 type BeslenmeTercihi = 'dengeli' | 'keto' | 'yuksekProtein' | 'dusukKarbonhidrat' | 'vejetaryen';
 type UykuDuzeni = 'yetersiz' | 'orta' | 'iyi' | 'uzun';
 type AnimasyonTipi = 'sagdan' | 'buyuyerek' | 'belirme';
+type IkonAdi = ComponentProps<typeof MaterialCommunityIcons>['name'];
 
 type OnboardingCevaplari = {
   isim: string;
@@ -75,16 +79,29 @@ const ANIMASYON_TIPLERI: AnimasyonTipi[] = [
 ];
 
 const ADIM_BASLIKLARI = [
-  'Sana nasıl hitap edelim?',
-  'Temel hedefin ne?',
-  'Cinsiyet ve yaşını öğrenelim',
-  'Boyun ve kilon nedir?',
-  'Hedef kilon ne olsun?',
-  'Aktivite düzeyin nasıl?',
-  'Beslenme tercihin ne?',
-  'Günlük su tüketimin?',
-  'Uyku düzenin nasıl?',
-  'Seni motive eden ne?',
+  'Sana ne diyelim?',
+  'Bugünkü hedefin ne?',
+  'Yaşını ve cinsiyetini öğrenelim',
+  'Mezura ve tartı zamanı!',
+  'Nereye varmak istiyorsun?',
+  'Günün ne kadar hareketli?',
+  'Tabağında neler dönüyor?',
+  'Su içme alışkanlığın nasıl?',
+  'Kaç saat kestiriyorsun?',
+  'Seni ayağa kaldıran ne?',
+];
+
+const ADIM_IKONLARI: IkonAdi[] = [
+  'crown',
+  'bullseye-arrow',
+  'human',
+  'scale-bathroom',
+  'weight',
+  'run',
+  'food-steak',
+  'water-outline',
+  'sleep',
+  'fire',
 ];
 
 const TEMEL_HEDEF_SECENEKLERI: { id: TemelHedef; etiket: string }[] = [
@@ -92,6 +109,12 @@ const TEMEL_HEDEF_SECENEKLERI: { id: TemelHedef; etiket: string }[] = [
   { id: 'al', etiket: 'Kilo Almak' },
   { id: 'koru', etiket: 'Kilomu Korumak' },
 ];
+
+const GECIS_ICERIGI: Record<TemelHedef, { ikon: IkonAdi; mesaj: string }> = {
+  ver: { ikon: 'run-fast', mesaj: 'Koşu bandının fişini takıyoruz...' },
+  al: { ikon: 'dumbbell', mesaj: 'Ağırlıklar ısınıyor, porsiyonlar büyüyor...' },
+  koru: { ikon: 'yin-yang', mesaj: 'Mükemmel dengeyi kilitliyoruz...' },
+};
 
 const CINSIYET_SECENEKLERI: { id: Cinsiyet; etiket: string }[] = [
   { id: 'kadin', etiket: 'Kadın' },
@@ -249,7 +272,7 @@ function geriBildirimUret(adim: number, cevaplar: OnboardingCevaplari) {
 
   switch (adim) {
     case 0:
-      return isim.length > 0 ? `Merhaba ${isim}, bu zarif yolculuğa hoş geldin.` : '';
+      return isim.length > 0 ? `Merhaba ${isim}, ekibe hoş geldin! Kaloriler titriyor.` : '';
     case 1:
       return cevaplar.temelHedef ? TEMEL_HEDEF_GERI_BILDIRIM[cevaplar.temelHedef] : '';
     case 2:
@@ -299,7 +322,7 @@ function SecimKarti({ etiket, aciklama, secili, onPress }: SecimKartiProps) {
   const metinRengi = doluluk.interpolate({ inputRange: [0, 1], outputRange: [ALTIN, SIYAH] });
 
   const basildi = () => {
-    Animated.spring(basiliOlcek, { toValue: 0.97, useNativeDriver: true, speed: 40 }).start();
+    Animated.spring(basiliOlcek, { toValue: 0.96, useNativeDriver: true, speed: 40 }).start();
   };
 
   const birakildi = () => {
@@ -324,29 +347,133 @@ function SecimKarti({ etiket, aciklama, secili, onPress }: SecimKartiProps) {
   );
 }
 
+const SATIR_YUKSEKLIGI = 44;
+const GORUNUR_ALAN = SATIR_YUKSEKLIGI * 5;
+
+type DikeySeciciProps = {
+  etiket: string;
+  deger: string;
+  onDegisti: (deger: string) => void;
+  minDeger: number;
+  maxDeger: number;
+  adimBuyuklugu?: number;
+  birim: string;
+  zekiMetin: string;
+  varyant: 'mezura' | 'tarti';
+};
+
+function DikeySecici({
+  etiket,
+  deger,
+  onDegisti,
+  minDeger,
+  maxDeger,
+  adimBuyuklugu = 1,
+  birim,
+  zekiMetin,
+  varyant,
+}: DikeySeciciProps) {
+  const kaydirmaRef = useRef<ScrollView>(null);
+  const okumaOlcegi = useRef(new Animated.Value(1)).current;
+  const ilkYerlesimYapildi = useRef(false);
+
+  const degerler = useMemo(() => {
+    const liste: number[] = [];
+    for (let v = minDeger; v <= maxDeger; v += adimBuyuklugu) {
+      liste.push(Math.round(v * 10) / 10);
+    }
+    return liste;
+  }, [minDeger, maxDeger, adimBuyuklugu]);
+
+  useEffect(() => {
+    okumaOlcegi.setValue(0.85);
+    Animated.spring(okumaOlcegi, { toValue: 1, useNativeDriver: true, friction: 4 }).start();
+  }, [deger, okumaOlcegi]);
+
+  useEffect(() => {
+    if (ilkYerlesimYapildi.current) {
+      return;
+    }
+    ilkYerlesimYapildi.current = true;
+    const mevcutDeger = Number(deger) || minDeger;
+    const index = Math.round((mevcutDeger - minDeger) / adimBuyuklugu);
+    requestAnimationFrame(() => {
+      kaydirmaRef.current?.scrollTo({ y: index * SATIR_YUKSEKLIGI, animated: false });
+    });
+  }, [deger, minDeger, adimBuyuklugu]);
+
+  const kaydirmaBitti = (olay: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const y = olay.nativeEvent.contentOffset.y;
+    const index = Math.max(0, Math.min(degerler.length - 1, Math.round(y / SATIR_YUKSEKLIGI)));
+    const yeniDeger = degerler[index];
+    onDegisti(String(yeniDeger));
+    kaydirmaRef.current?.scrollTo({ y: index * SATIR_YUKSEKLIGI, animated: true });
+  };
+
+  return (
+    <View style={stiller.dikeySeciciKok}>
+      <Text style={stiller.dikeySeciciEtiket}>{etiket}</Text>
+      <Animated.Text
+        style={[stiller.dikeySeciciBuyukSayi, { transform: [{ scale: okumaOlcegi }] }]}>
+        {`${deger || minDeger}${birim}`}
+      </Animated.Text>
+      <View
+        style={[
+          stiller.dikeySeciciCubukAlani,
+          varyant === 'tarti' ? stiller.dikeySeciciTartiPaneli : stiller.dikeySeciciMezuraPaneli,
+        ]}>
+        <View style={stiller.dikeySeciciVurguCubugu} pointerEvents="none" />
+        <ScrollView
+          ref={kaydirmaRef}
+          showsVerticalScrollIndicator={false}
+          snapToInterval={SATIR_YUKSEKLIGI}
+          decelerationRate="fast"
+          onMomentumScrollEnd={kaydirmaBitti}
+          contentContainerStyle={{ paddingVertical: SATIR_YUKSEKLIGI * 2 }}>
+          {degerler.map((v) => (
+            <View key={v} style={stiller.dikeySeciciSatir}>
+              <Text
+                style={[
+                  stiller.dikeySeciciSatirYazisi,
+                  Number(deger) === v ? stiller.dikeySeciciSatirYazisiAktif : null,
+                ]}>
+                {v}
+              </Text>
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+      <Text style={stiller.zekiMetin}>{zekiMetin}</Text>
+    </View>
+  );
+}
+
 export default function OnboardingScreen() {
   const { profilKaydet } = useVeri();
 
   const [adim, setAdim] = useState(0);
   const [cevaplar, setCevaplar] = useState<OnboardingCevaplari>(BOS_CEVAPLAR);
   const [hesaplaniyor, setHesaplaniyor] = useState(false);
+  const [geciyor, setGeciyor] = useState<TemelHedef | null>(null);
 
   const cevirX = useRef(new Animated.Value(0)).current;
   const cevirY = useRef(new Animated.Value(0)).current;
   const olcek = useRef(new Animated.Value(1)).current;
   const saydamlik = useRef(new Animated.Value(0)).current;
 
-  const butonDoluluk = useRef(new Animated.Value(0)).current;
+  const butonOlcek = useRef(new Animated.Value(1)).current;
   const logoSaydamlik = useRef(new Animated.Value(0)).current;
+  const nabizOlcegi = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
+    logoSaydamlik.setValue(0);
     Animated.timing(logoSaydamlik, {
       toValue: 1,
-      duration: 1400,
+      duration: 700,
       easing: Easing.out(Easing.cubic),
       useNativeDriver: true,
     }).start();
-  }, [logoSaydamlik]);
+  }, [adim, logoSaydamlik]);
 
   useEffect(() => {
     const tip = ANIMASYON_TIPLERI[adim] ?? 'belirme';
@@ -387,11 +514,44 @@ export default function OnboardingScreen() {
     ]).start();
   }, [adim, cevirX, cevirY, olcek, saydamlik]);
 
+  useEffect(() => {
+    if (!geciyor) {
+      return;
+    }
+    const dongu = Animated.loop(
+      Animated.sequence([
+        Animated.timing(nabizOlcegi, {
+          toValue: 1.15,
+          duration: 600,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(nabizOlcegi, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    dongu.start();
+    return () => dongu.stop();
+  }, [geciyor, nabizOlcegi]);
+
   const cevapGuncelle = <K extends keyof OnboardingCevaplari>(
     alan: K,
     deger: OnboardingCevaplari[K]
   ) => {
     setCevaplar((onceki) => ({ ...onceki, [alan]: deger }));
+  };
+
+  const hedefSecildiVeGec = (id: TemelHedef) => {
+    cevapGuncelle('temelHedef', id);
+    setGeciyor(id);
+    setTimeout(() => {
+      setGeciyor(null);
+      setAdim((onceki) => onceki + 1);
+    }, 2500);
   };
 
   const adimGecerliMi = useMemo(() => {
@@ -457,30 +617,35 @@ export default function OnboardingScreen() {
   };
 
   const butonBasildi = () => {
-    if (!adimGecerliMi) {
-      return;
-    }
-    Animated.timing(butonDoluluk, { toValue: 1, duration: 220, useNativeDriver: false }).start();
+    Animated.spring(butonOlcek, { toValue: 0.95, useNativeDriver: true, speed: 40 }).start();
   };
 
   const butonBirakildi = () => {
-    Animated.timing(butonDoluluk, { toValue: 0, duration: 280, useNativeDriver: false }).start();
+    Animated.spring(butonOlcek, { toValue: 1, useNativeDriver: true, speed: 40 }).start();
   };
-
-  const butonArkaPlani = butonDoluluk.interpolate({ inputRange: [0, 1], outputRange: [SIYAH, ALTIN] });
-  const butonMetinRengi = butonDoluluk.interpolate({ inputRange: [0, 1], outputRange: [ALTIN, SIYAH] });
 
   if (hesaplaniyor) {
     return (
       <View style={[stiller.kok, stiller.yuklemeKok]}>
         <StatusBar style="light" />
         <ActivityIndicator size="large" color={ALTIN} />
-        <Animated.Text style={stiller.yuklemeBasligi}>
-          Hedeflerin Analiz Ediliyor...
-        </Animated.Text>
-        <Animated.Text style={stiller.yuklemeAltYazi}>
+        <Text style={stiller.yuklemeBasligi}>Hedeflerin Analiz Ediliyor...</Text>
+        <Text style={stiller.yuklemeAltYazi}>
           Harris-Benedict formülüyle sana özel hesaplanıyor
-        </Animated.Text>
+        </Text>
+      </View>
+    );
+  }
+
+  if (geciyor) {
+    const icerik = GECIS_ICERIGI[geciyor];
+    return (
+      <View style={[stiller.kok, stiller.gecisKok]}>
+        <StatusBar style="light" />
+        <Animated.View style={{ transform: [{ scale: nabizOlcegi }] }}>
+          <MaterialCommunityIcons name={icerik.ikon} size={90} color={ALTIN} />
+        </Animated.View>
+        <Text style={stiller.gecisMesaji}>{icerik.mesaj}</Text>
       </View>
     );
   }
@@ -493,7 +658,7 @@ export default function OnboardingScreen() {
       <SafeAreaView style={stiller.kok}>
         <View style={stiller.ustBar}>
           <Pressable onPress={geriGit} hitSlop={12} style={stiller.geriAlani}>
-            {adim > 0 ? <Animated.Text style={stiller.geriYazisi}>‹ Geri</Animated.Text> : null}
+            {adim > 0 ? <Text style={stiller.geriYazisi}>‹ Geri</Text> : null}
           </Pressable>
           <View style={stiller.ilerlemeArkaPlani}>
             <View
@@ -503,13 +668,13 @@ export default function OnboardingScreen() {
               ]}
             />
           </View>
-          <Animated.Text style={stiller.adimSayaci}>
+          <Text style={stiller.adimSayaci}>
             {adim + 1}/{TOPLAM_ADIM}
-          </Animated.Text>
+          </Text>
         </View>
 
         <Animated.View style={[stiller.logoAlani, { opacity: logoSaydamlik }]}>
-          <MaterialCommunityIcons name="crown-outline" size={32} color={ALTIN} />
+          <MaterialCommunityIcons name={ADIM_IKONLARI[adim]} size={70} color={ALTIN} />
         </Animated.View>
 
         <KeyboardAvoidingView
@@ -525,7 +690,7 @@ export default function OnboardingScreen() {
                   opacity: saydamlik,
                   transform: [{ translateX: cevirX }, { translateY: cevirY }, { scale: olcek }],
                 }}>
-                <Animated.Text style={stiller.baslik}>{ADIM_BASLIKLARI[adim]}</Animated.Text>
+                <Text style={stiller.baslik}>{ADIM_BASLIKLARI[adim]}</Text>
 
                 <View style={stiller.icerikAlani}>
                   {adim === 0 ? (
@@ -533,7 +698,7 @@ export default function OnboardingScreen() {
                       autoFocus
                       value={cevaplar.isim}
                       onChangeText={(metin) => cevapGuncelle('isim', metin)}
-                      placeholder="Adın"
+                      placeholder="İsmin ne?"
                       placeholderTextColor={ALTIN_SOLUK}
                       selectionColor={ALTIN}
                       style={stiller.metinGirisi}
@@ -548,7 +713,7 @@ export default function OnboardingScreen() {
                           key={secenek.id}
                           etiket={secenek.etiket}
                           secili={cevaplar.temelHedef === secenek.id}
-                          onPress={() => cevapGuncelle('temelHedef', secenek.id)}
+                          onPress={() => hedefSecildiVeGec(secenek.id)}
                         />
                       ))}
                     </View>
@@ -580,35 +745,28 @@ export default function OnboardingScreen() {
                   ) : null}
 
                   {adim === 3 ? (
-                    <View style={stiller.ikiliGirisSatiri}>
-                      <View style={stiller.ikiliGirisAlani}>
-                        <Animated.Text style={stiller.girisEtiketi}>Boy (cm)</Animated.Text>
-                        <TextInput
-                          value={cevaplar.boy}
-                          onChangeText={(metin) =>
-                            cevapGuncelle('boy', metin.replace(/[^0-9]/g, ''))
-                          }
-                          keyboardType="number-pad"
-                          placeholder="170"
-                          placeholderTextColor={ALTIN_SOLUK}
-                          selectionColor={ALTIN}
-                          style={stiller.metinGirisi}
-                        />
-                      </View>
-                      <View style={stiller.ikiliGirisAlani}>
-                        <Animated.Text style={stiller.girisEtiketi}>Kilo (kg)</Animated.Text>
-                        <TextInput
-                          value={cevaplar.kilo}
-                          onChangeText={(metin) =>
-                            cevapGuncelle('kilo', metin.replace(/[^0-9.]/g, ''))
-                          }
-                          keyboardType="decimal-pad"
-                          placeholder="70"
-                          placeholderTextColor={ALTIN_SOLUK}
-                          selectionColor={ALTIN}
-                          style={stiller.metinGirisi}
-                        />
-                      </View>
+                    <View style={stiller.dikeySeciciSatiriDikey}>
+                      <DikeySecici
+                        etiket="Boy (cm)"
+                        deger={cevaplar.boy}
+                        onDegisti={(deger) => cevapGuncelle('boy', deger)}
+                        minDeger={140}
+                        maxDeger={220}
+                        birim=" cm"
+                        zekiMetin="Boyun kilona, kilon bize emanet."
+                        varyant="mezura"
+                      />
+                      <DikeySecici
+                        etiket="Kilo (kg)"
+                        deger={cevaplar.kilo}
+                        onDegisti={(deger) => cevapGuncelle('kilo', deger)}
+                        minDeger={35}
+                        maxDeger={180}
+                        adimBuyuklugu={0.5}
+                        birim=" kg"
+                        zekiMetin="Tartılar yalan söyleyebilir ama biz asla."
+                        varyant="tarti"
+                      />
                     </View>
                   ) : null}
 
@@ -696,9 +854,7 @@ export default function OnboardingScreen() {
                   ) : null}
                 </View>
 
-                {geriBildirim ? (
-                  <Animated.Text style={stiller.geriBildirim}>{geriBildirim}</Animated.Text>
-                ) : null}
+                {geriBildirim ? <Text style={stiller.geriBildirim}>{geriBildirim}</Text> : null}
               </Animated.View>
             </ScrollView>
           </TouchableWithoutFeedback>
@@ -709,11 +865,11 @@ export default function OnboardingScreen() {
             <Animated.View
               style={[
                 stiller.ileriButonu,
-                { backgroundColor: butonArkaPlani, opacity: adimGecerliMi ? 1 : 0.35 },
+                { opacity: adimGecerliMi ? 1 : 0.35, transform: [{ scale: butonOlcek }] },
               ]}>
-              <Animated.Text style={[stiller.ileriButonuYazisi, { color: butonMetinRengi }]}>
-                {adim === TOPLAM_ADIM - 1 ? 'Analizi Başlat' : 'İleri'}
-              </Animated.Text>
+              <Text style={stiller.ileriButonuYazisi}>
+                {adim === TOPLAM_ADIM - 1 ? 'Hadi Hesaplayalım!' : 'Sıradaki'}
+              </Text>
             </Animated.View>
           </Pressable>
         </View>
@@ -776,10 +932,11 @@ const stiller = StyleSheet.create({
   },
   baslik: {
     color: ALTIN,
-    fontSize: 30,
-    fontWeight: '300',
-    letterSpacing: 1.5,
+    fontFamily: 'StoriesGrand',
+    fontSize: 34,
+    letterSpacing: 1,
     marginBottom: 36,
+    textAlign: 'center',
   },
   icerikAlani: {
     gap: 12,
@@ -798,9 +955,17 @@ const stiller = StyleSheet.create({
   secimKarti: {
     borderWidth: 1,
     borderColor: ALTIN,
-    borderRadius: 16,
+    borderTopLeftRadius: 26,
+    borderBottomRightRadius: 26,
+    borderTopRightRadius: 6,
+    borderBottomLeftRadius: 6,
     paddingVertical: 18,
     paddingHorizontal: 20,
+    shadowColor: ALTIN,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   secimEtiketi: {
     fontSize: 17,
@@ -825,19 +990,80 @@ const stiller = StyleSheet.create({
   ikinciGiris: {
     marginTop: 4,
   },
-  girisEtiketi: {
+  dikeySeciciSatiriDikey: {
+    gap: 28,
+  },
+  dikeySeciciKok: {
+    alignItems: 'center',
+  },
+  dikeySeciciEtiket: {
     color: 'rgba(232,195,124,0.55)',
     fontSize: 13,
     fontWeight: '300',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
     marginBottom: 6,
-    letterSpacing: 0.8,
   },
-  ikiliGirisSatiri: {
-    flexDirection: 'row',
-    gap: 20,
+  dikeySeciciBuyukSayi: {
+    color: ALTIN,
+    fontFamily: 'StoriesGrand',
+    fontSize: 34,
+    marginBottom: 10,
   },
-  ikiliGirisAlani: {
-    flex: 1,
+  dikeySeciciCubukAlani: {
+    height: GORUNUR_ALAN,
+    width: 160,
+    borderRadius: 18,
+    overflow: 'hidden',
+  },
+  dikeySeciciMezuraPaneli: {
+    borderWidth: 1,
+    borderColor: ALTIN_COK_SOLUK,
+    backgroundColor: 'transparent',
+  },
+  dikeySeciciTartiPaneli: {
+    borderWidth: 1,
+    borderColor: ALTIN,
+    backgroundColor: 'rgba(10,11,16,0.85)',
+    shadowColor: ALTIN,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  dikeySeciciVurguCubugu: {
+    position: 'absolute',
+    top: SATIR_YUKSEKLIGI * 2,
+    left: 0,
+    right: 0,
+    height: SATIR_YUKSEKLIGI,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: ALTIN,
+  },
+  dikeySeciciSatir: {
+    height: SATIR_YUKSEKLIGI,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dikeySeciciSatirYazisi: {
+    color: 'rgba(232,195,124,0.35)',
+    fontSize: 18,
+    fontWeight: '300',
+  },
+  dikeySeciciSatirYazisiAktif: {
+    color: ALTIN,
+    fontSize: 22,
+    fontWeight: '400',
+  },
+  zekiMetin: {
+    color: 'rgba(232,195,124,0.5)',
+    fontSize: 12,
+    fontWeight: '300',
+    fontStyle: 'italic',
+    marginTop: 10,
+    textAlign: 'center',
+    maxWidth: 200,
   },
   geriBildirim: {
     color: ALTIN,
@@ -846,6 +1072,7 @@ const stiller = StyleSheet.create({
     marginTop: 30,
     letterSpacing: 0.5,
     fontStyle: 'italic',
+    textAlign: 'center',
   },
   altBar: {
     paddingHorizontal: 28,
@@ -854,13 +1081,23 @@ const stiller = StyleSheet.create({
   },
   ileriButonu: {
     height: 56,
-    borderRadius: 28,
+    backgroundColor: SIYAH,
     borderWidth: 1,
     borderColor: ALTIN,
+    borderTopLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    borderTopRightRadius: 10,
+    borderBottomLeftRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: ALTIN,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    elevation: 8,
   },
   ileriButonuYazisi: {
+    color: ALTIN,
     fontSize: 17,
     fontWeight: '400',
     letterSpacing: 1,
@@ -873,9 +1110,9 @@ const stiller = StyleSheet.create({
   },
   yuklemeBasligi: {
     color: ALTIN,
-    fontSize: 22,
-    fontWeight: '300',
-    letterSpacing: 1.5,
+    fontFamily: 'StoriesGrand',
+    fontSize: 24,
+    letterSpacing: 1,
     textAlign: 'center',
   },
   yuklemeAltYazi: {
@@ -884,5 +1121,18 @@ const stiller = StyleSheet.create({
     fontWeight: '300',
     textAlign: 'center',
     letterSpacing: 0.3,
+  },
+  gecisKok: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    gap: 24,
+  },
+  gecisMesaji: {
+    color: ALTIN,
+    fontFamily: 'StoriesGrand',
+    fontSize: 22,
+    letterSpacing: 0.5,
+    textAlign: 'center',
   },
 });
