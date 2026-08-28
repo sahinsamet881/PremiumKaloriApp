@@ -1,8 +1,12 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
-import { ALTIN, ALTIN_COK_SOLUK, ALTIN_ORTA_SOLUK, SIYAH } from '@/constants/luxTheme';
+import { ALTIN, ALTIN_COK_SOLUK, ALTIN_ORTA_SOLUK, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
+import { PREMIUM_AKTIF } from '@/constants/premium';
 import { useVeri } from '@/context/DataContext';
 
 type MakroSatiriProps = {
@@ -25,7 +29,30 @@ function MakroSatiri({ etiket, yuzde }: MakroSatiriProps) {
 }
 
 export default function AnalysisScreen() {
-  const { kullanici } = useVeri();
+  const { kullanici, profilSifirla } = useVeri();
+
+  const profiliSifirlaSor = () => {
+    Alert.alert(
+      'Profili Güncelle',
+      'Soru-cevap ekranına dönmek üzeresin. Mevcut profil bilgilerin sıfırlanacak.',
+      [
+        { text: 'Vazgeç', style: 'cancel' },
+        {
+          text: 'Devam Et',
+          style: 'destructive',
+          onPress: () => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            profilSifirla();
+            router.replace('/onboarding');
+          },
+        },
+      ]
+    );
+  };
+
+  const premiumaGec = () => {
+    Alert.alert('Çok Yakında', 'Premium deneyim kapıda, sabırsızlanıyoruz!');
+  };
 
   const proteinKalori = kullanici.makroHedefleri.protein * 4;
   const karbKalori = kullanici.makroHedefleri.karbonhidrat * 4;
@@ -40,30 +67,74 @@ export default function AnalysisScreen() {
     <View style={stiller.container}>
       <StatusBar style="light" />
       <ScrollView contentContainerStyle={stiller.icerik} showsVerticalScrollIndicator={false}>
-        <Text style={stiller.baslik}>Analiz</Text>
+        <View style={stiller.baslikSatiri}>
+          <Text style={stiller.baslik}>Analiz</Text>
+          <Pressable
+            onPress={profiliSifirlaSor}
+            style={({ pressed }) => [
+              stiller.profilButonu,
+              pressed ? stiller.profilButonuBasili : null,
+            ]}>
+            <MaterialCommunityIcons name="account-cog-outline" size={16} color={ALTIN} />
+            <Text style={stiller.profilButonuYazisi}>Profili Güncelle</Text>
+          </Pressable>
+        </View>
 
-        <View style={stiller.kart}>
-          <Text style={stiller.kartBasligi}>Haftalık İlerleme</Text>
-          <View style={stiller.grafikAlani}>
-            <Svg width="100%" height="100%" viewBox="0 0 300 120">
-              <Path
-                d="M0,95 C35,30 65,110 100,65 C135,20 165,105 200,55 C230,15 265,80 300,45"
-                stroke={ALTIN}
-                strokeWidth={3}
-                fill="none"
-                strokeLinecap="round"
-              />
-            </Svg>
+        {PREMIUM_AKTIF ? (
+          <>
+            <View style={stiller.kart}>
+              <Text style={stiller.kartBasligi}>Haftalık İlerleme</Text>
+              <View style={stiller.grafikAlani}>
+                <Svg width="100%" height="100%" viewBox="0 0 300 120">
+                  <Path
+                    d="M0,95 C35,30 65,110 100,65 C135,20 165,105 200,55 C230,15 265,80 300,45"
+                    stroke={ALTIN}
+                    strokeWidth={3}
+                    fill="none"
+                    strokeLinecap="round"
+                  />
+                </Svg>
+              </View>
+              <Text style={stiller.grafikNotu}>Veriler yeterince birikince burada canlanacak.</Text>
+            </View>
+
+            <View style={stiller.kart}>
+              <Text style={stiller.kartBasligi}>Makro Dağılımı</Text>
+              <MakroSatiri etiket="Protein" yuzde={proteinYuzde} />
+              <MakroSatiri etiket="Karbonhidrat" yuzde={karbYuzde} />
+              <MakroSatiri etiket="Yağ" yuzde={yagYuzde} />
+            </View>
+          </>
+        ) : (
+          <View style={stiller.kilitKarti}>
+            <View style={stiller.kilitIkon}>
+              <MaterialCommunityIcons name="crown" size={38} color={SIYAH} />
+            </View>
+            <Text style={stiller.kilitBaslik}>Detaylı Analiz{'\n'}Premium&apos;a Özel</Text>
+            <Text style={stiller.kilitAciklama}>
+              Haftalık ilerleme grafiğin, makro dağılımın ve kişisel trend yorumların Premium üyelere
+              açık.
+            </Text>
+            <View style={stiller.kilitListe}>
+              <View style={stiller.kilitSatiri}>
+                <MaterialCommunityIcons name="chart-line" size={18} color={ALTIN} />
+                <Text style={stiller.kilitSatiriYazisi}>Haftalık ilerleme grafiği</Text>
+              </View>
+              <View style={stiller.kilitSatiri}>
+                <MaterialCommunityIcons name="chart-donut" size={18} color={ALTIN} />
+                <Text style={stiller.kilitSatiriYazisi}>Detaylı makro dağılımı</Text>
+              </View>
+              <View style={stiller.kilitSatiri}>
+                <MaterialCommunityIcons name="lightbulb-on-outline" size={18} color={ALTIN} />
+                <Text style={stiller.kilitSatiriYazisi}>Kişisel trend yorumları</Text>
+              </View>
+            </View>
+            <Pressable onPress={premiumaGec} style={stiller.premiumButonu}>
+              <MaterialCommunityIcons name="star-four-points" size={18} color={SIYAH} />
+              <Text style={stiller.premiumButonuYazisi}>Premium&apos;a Geç</Text>
+            </Pressable>
           </View>
-          <Text style={stiller.grafikNotu}>Veriler yeterince birikince burada canlanacak.</Text>
-        </View>
-
-        <View style={stiller.kart}>
-          <Text style={stiller.kartBasligi}>Makro Dağılımı</Text>
-          <MakroSatiri etiket="Protein" yuzde={proteinYuzde} />
-          <MakroSatiri etiket="Karbonhidrat" yuzde={karbYuzde} />
-          <MakroSatiri etiket="Yağ" yuzde={yagYuzde} />
-        </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -79,12 +150,42 @@ const stiller = StyleSheet.create({
     paddingTop: 80,
     paddingBottom: 60,
   },
+  baslikSatiri: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 28,
+  },
   baslik: {
     color: ALTIN,
     fontFamily: 'StoriesGrand',
     fontSize: 34,
     letterSpacing: 1,
-    marginBottom: 28,
+  },
+  profilButonu: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderColor: ALTIN_SOLUK,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  profilButonuBasili: {
+    opacity: 0.8,
+    transform: [{ scale: 0.97 }],
+  },
+  profilButonuYazisi: {
+    color: ALTIN,
+    fontSize: 12,
+    fontWeight: '400',
+    letterSpacing: 0.3,
   },
   kart: {
     borderWidth: 1,
@@ -145,5 +246,81 @@ const stiller = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
     backgroundColor: ALTIN,
+  },
+  kilitKarti: {
+    borderWidth: 1,
+    borderColor: ALTIN,
+    backgroundColor: 'rgba(10,11,16,0.6)',
+    borderRadius: 20,
+    padding: 24,
+    alignItems: 'center',
+  },
+  kilitIkon: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: ALTIN,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 12,
+  },
+  kilitBaslik: {
+    color: ALTIN,
+    fontFamily: 'StoriesGrand',
+    fontSize: 22,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    lineHeight: 30,
+    marginTop: 18,
+  },
+  kilitAciklama: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 13,
+    fontWeight: '300',
+    lineHeight: 19,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  kilitListe: {
+    alignSelf: 'stretch',
+    gap: 12,
+    marginTop: 22,
+    marginBottom: 24,
+  },
+  kilitSatiri: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  kilitSatiriYazisi: {
+    color: ALTIN,
+    fontSize: 14,
+    fontWeight: '300',
+    letterSpacing: 0.3,
+  },
+  premiumButonu: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    alignSelf: 'stretch',
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: ALTIN,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.6,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  premiumButonuYazisi: {
+    color: SIYAH,
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.5,
   },
 });

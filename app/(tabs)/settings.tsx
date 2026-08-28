@@ -1,4 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
 import { Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -70,6 +71,10 @@ export default function SettingsScreen() {
     Alert.alert('Çok Yakında', 'Premium deneyim kapıda, sabırsızlanıyoruz!');
   };
 
+  const gecmiseGit = () => {
+    router.push('/(tabs)/history');
+  };
+
   return (
     <ScrollView style={stiller.container} contentContainerStyle={stiller.icerik}>
       <StatusBar style="light" />
@@ -77,6 +82,17 @@ export default function SettingsScreen() {
         <MaterialCommunityIcons name="crown-outline" size={26} color={ALTIN} />
         <Text style={stiller.baslik}>VIP Profil</Text>
       </View>
+
+      <Pressable onPress={gecmiseGit} style={stiller.gecmisButonu}>
+        <View style={stiller.gecmisIkonKutusu}>
+          <MaterialCommunityIcons name="history" size={20} color={ALTIN} />
+        </View>
+        <View style={stiller.gecmisMetinAlani}>
+          <Text style={stiller.gecmisBasligi}>Geçmişi Görüntüle</Text>
+          <Text style={stiller.gecmisAciklamasi}>Seri takvimin ve geçmiş günlerin</Text>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={22} color={ALTIN_ORTA_SOLUK} />
+      </Pressable>
 
       <Pressable onPress={premiumaGec} style={stiller.vipLoungeKarti}>
         <MaterialCommunityIcons name="crown" size={40} color={SIYAH} />
@@ -166,6 +182,47 @@ const stiller = StyleSheet.create({
     letterSpacing: 1.5,
     marginBottom: 16,
     marginTop: 8,
+  },
+  gecmisButonu: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderWidth: 1,
+    borderColor: ALTIN,
+    backgroundColor: 'rgba(232,195,124,0.06)',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 28,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  gecmisIkonKutusu: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1,
+    borderColor: ALTIN_ORTA_SOLUK,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gecmisMetinAlani: {
+    flex: 1,
+  },
+  gecmisBasligi: {
+    color: ALTIN,
+    fontSize: 15,
+    fontWeight: '400',
+    letterSpacing: 0.3,
+  },
+  gecmisAciklamasi: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 12,
+    fontWeight: '300',
+    marginTop: 3,
   },
   vipLoungeKarti: {
     alignItems: 'center',

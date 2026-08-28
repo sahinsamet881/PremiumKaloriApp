@@ -55,10 +55,18 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="coach"
+        options={{
+          title: 'AI Koç',
+          tabBarIcon: ({ color }) => (
+            <MaterialCommunityIcons name="robot-outline" size={24} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="history"
         options={{
-          title: 'Geçmiş',
-          tabBarIcon: ({ color }) => <MaterialCommunityIcons name="history" size={24} color={color} />,
+          href: null,
         }}
       />
       <Tabs.Screen

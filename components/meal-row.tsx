@@ -18,8 +18,10 @@ export function MealRow({ id, isim, kalori, eklenmeSaati }: Ogun) {
     <Pressable
       style={({ pressed }) => [styles.satir, pressed && styles.satirBasili]}
       onPress={silmeyiOnayla}>
-      <View>
-        <Text style={styles.isim}>{isim}</Text>
+      <View style={styles.solAlan}>
+        <Text style={styles.isim} numberOfLines={1} ellipsizeMode="tail">
+          {isim}
+        </Text>
         <Text style={styles.saat}>{eklenmeSaati}</Text>
       </View>
       <Text style={styles.kalori}>{kalori} kcal</Text>
@@ -33,7 +35,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: ALTIN,
+    borderColor: 'rgba(255, 215, 0, 0.4)',
     borderRadius: 14,
     paddingVertical: 16,
     paddingHorizontal: 18,
@@ -41,6 +43,10 @@ const styles = StyleSheet.create({
   },
   satirBasili: {
     opacity: 0.5,
+  },
+  solAlan: {
+    flex: 1,
+    paddingRight: 10,
   },
   isim: {
     color: ALTIN,
@@ -60,5 +66,7 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '300',
     letterSpacing: 1,
+    flexShrink: 0,
+    textAlign: 'right',
   },
 });
