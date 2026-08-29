@@ -9,7 +9,7 @@ import { ALTIN, ALTIN_COK_SOLUK, ALTIN_ORTA_SOLUK, SIYAH, SURFACE } from '@/cons
 import { useVeri } from '@/context/DataContext';
 import { Makrolar } from '@/types';
 
-type IkonAdi = 'bolt.fill' | 'star.fill' | 'magnifyingglass';
+type IkonAdi = 'bolt.fill' | 'star.fill' | 'magnifyingglass' | 'barcode.viewfinder';
 
 type LuksSecenekKartiProps = {
   ikon: IkonAdi;
@@ -100,6 +100,12 @@ export default function ModalScreen() {
             baslik="Yemek Ara"
             aciklama="Veritabanından seç, porsiyonu ayarla"
             onPress={() => router.push('/search')}
+          />
+          <LuksSecenekKarti
+            ikon="barcode.viewfinder"
+            baslik="Barkod Tara"
+            aciklama="Ambalajlı ürünü kameradan oku"
+            onPress={() => router.push('/barkod')}
           />
         </View>
 

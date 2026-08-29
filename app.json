@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "Adım sayısı, aktif enerji ve kilo verilerini okuyup günlük kalori hedefini kişiselleştirmek için Apple Health erişimi istiyoruz.",
+        "NSHealthUpdateUsageDescription": "Eklediğin öğünlerin kalori ve makro değerlerini ve su tüketimini Apple Health'e kaydetmek için erişim istiyoruz."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -42,7 +46,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Tabağını yapay zekaya gösterebilmek için kameranı kullanmamıza izin ver."
+          "cameraPermission": "Yemeğinin fotoğrafını çekmek ve ambalajlı ürünlerin barkodunu okuyup besin değerlerini getirmek için kameranı kullanmamıza izin ver."
         }
       ]
     ],

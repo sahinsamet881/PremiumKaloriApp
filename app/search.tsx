@@ -1,31 +1,66 @@
 import { router } from 'expo-router';
-import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { ALTIN, ALTIN_ORTA_SOLUK, ALTIN_PLACEHOLDER, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
-import { YerelBesin, YEREL_BESIN_VERITABANI } from '@/data/foodDatabase';
+import {
+  ALTIN,
+  ALTIN_COK_SOLUK,
+  ALTIN_ORTA_SOLUK,
+  ALTIN_SOLUK,
+  SIYAH,
+  SURFACE,
+} from '@/constants/luxTheme';
+import { useVeri } from '@/context/DataContext';
+import { YEREL_BESIN_VERITABANI } from '@/data/foodDatabase';
+import { turkceNormalize, yemekAra } from '@/data/turkishFoods';
+
+type AramaSatiri = {
+  anahtar: string;
+  isim: string;
+  altBilgi: string;
+  kalori: number;
+  git: () => void;
+};
+
+function porsiyonKalori(kalori100: number, porsiyonGram: number): number {
+  return Math.round((kalori100 * porsiyonGram) / 100);
+}
 
 export default function SearchScreen() {
+  const { turkYemekleri } = useVeri();
   const [sorgu, setSorgu] = useState('');
 
-  const sonuclar = useMemo(() => {
-    const sorguTemiz = sorgu.trim().toLocaleLowerCase('tr-TR');
-
-    if (sorguTemiz.length === 0) {
+  const sonuclar = useMemo<AramaSatiri[]>(() => {
+    const aranan = turkceNormalize(sorgu);
+    if (aranan.length === 0) {
       return [];
     }
 
-    return YEREL_BESIN_VERITABANI.filter((besin) =>
-      besin.isim.toLocaleLowerCase('tr-TR').includes(sorguTemiz)
-    );
-  }, [sorgu]);
+    const yemekler: AramaSatiri[] = yemekAra(sorgu, turkYemekleri).map((yemek) => {
+      const kalori = porsiyonKalori(yemek.kalori100, yemek.porsiyonGram);
+      return {
+        anahtar: `yemek-${yemek.id}`,
+        isim: yemek.isim,
+        altBilgi: `${yemek.porsiyonAdi} (${yemek.porsiyonGram} g)`,
+        kalori,
+        git: () => router.push({ pathname: '/ogun-duzenle', params: { yemekId: yemek.id } }),
+      };
+    });
 
-  const besinSecildi = (besin: YerelBesin) => {
-    router.push({ pathname: '/ogun-duzenle', params: { besinId: besin.id } });
-  };
+    const besinler: AramaSatiri[] = YEREL_BESIN_VERITABANI.filter((besin) =>
+      turkceNormalize(besin.isim).includes(aranan)
+    ).map((besin) => ({
+      anahtar: `besin-${besin.id}`,
+      isim: besin.isim,
+      altBilgi: besin.porsiyon,
+      kalori: besin.kalori,
+      git: () => router.push({ pathname: '/ogun-duzenle', params: { besinId: besin.id } }),
+    }));
+
+    return [...yemekler, ...besinler];
+  }, [sorgu, turkYemekleri]);
 
   return (
     <View style={styles.container}>
@@ -43,7 +78,7 @@ export default function SearchScreen() {
           onChangeText={setSorgu}
           keyboardType="default"
           returnKeyType="search"
-          placeholder="Ne yedin?"
+          placeholder="Ne yedin? (ör. mercimek corbasi)"
           placeholderTextColor={ALTIN_SOLUK}
           selectionColor={ALTIN}
           style={styles.aramaGirisi}
@@ -51,45 +86,30 @@ export default function SearchScreen() {
       </View>
 
       {sorgu.trim().length === 0 ? (
-        <Text style={styles.durumMetni}>Aramaya başlamak için yaz</Text>
+        <Text style={styles.durumMetni}>Türk yemekleri veritabanında ara</Text>
       ) : sonuclar.length === 0 ? (
         <Text style={styles.durumMetni}>{`"${sorgu}" için sonuç bulunamadı`}</Text>
       ) : (
         <FlatList
           data={sonuclar}
-          keyExtractor={(besin) => besin.id}
+          keyExtractor={(satir) => satir.anahtar}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.sonucListesi}
           ItemSeparatorComponent={() => <View style={styles.ayirac} />}
           renderItem={({ item }) => (
             <Pressable
-              onPress={() => besinSecildi(item)}
+              onPress={item.git}
               style={({ pressed }) => [styles.sonucSatiri, pressed && styles.sonucSatiriBasili]}>
-              <View style={styles.gorselGolgesi}>
-                <View style={styles.gorselKapsayici}>
-                  {item.imageUrl ? (
-                    <Image
-                      source={{ uri: item.imageUrl }}
-                      style={styles.gorsel}
-                      contentFit="cover"
-                      transition={200}
-                      onError={(hata) =>
-                        console.log(`Görsel yüklenemedi: ${item.isim}`, hata.error)
-                      }
-                    />
-                  ) : null}
-                </View>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarYazi}>{item.isim.charAt(0).toLocaleUpperCase('tr-TR')}</Text>
               </View>
               <View style={styles.sonucBilgisi}>
-                <Text style={styles.sonucIsmi}>{item.isim}</Text>
-                <View style={styles.sonucAltSatir}>
-                  <Text style={styles.sonucPorsiyonu}>{item.porsiyon}</Text>
-                  <Text style={styles.sonucKalorisi}>{item.kalori} kcal</Text>
-                </View>
-                <Text style={styles.sonucMakrolari}>
-                  {`P: ${item.protein}g   K: ${item.karbonhidrat}g   Y: ${item.yag}g`}
+                <Text style={styles.sonucIsmi} numberOfLines={1}>
+                  {item.isim}
                 </Text>
+                <Text style={styles.sonucAlt}>{item.altBilgi}</Text>
               </View>
+              <Text style={styles.sonucKalorisi}>{item.kalori} kcal</Text>
             </Pressable>
           )}
         />
@@ -130,9 +150,9 @@ const styles = StyleSheet.create({
   aramaGirisi: {
     flex: 1,
     color: ALTIN,
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '300',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   durumMetni: {
     color: ALTIN_ORTA_SOLUK,
@@ -143,12 +163,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   sonucListesi: {
-    paddingTop: 20,
+    paddingTop: 18,
     paddingBottom: 40,
   },
   ayirac: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: ALTIN_SOLUK,
+    backgroundColor: ALTIN_COK_SOLUK,
   },
   sonucSatiri: {
     flexDirection: 'row',
@@ -159,59 +179,41 @@ const styles = StyleSheet.create({
   sonucSatiriBasili: {
     opacity: 0.5,
   },
-  gorselGolgesi: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
-    shadowColor: ALTIN,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  gorselKapsayici: {
-    flex: 1,
+  avatar: {
+    width: 40,
+    height: 40,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: ALTIN,
-    overflow: 'hidden',
-    backgroundColor: ALTIN_PLACEHOLDER,
+    borderColor: ALTIN_COK_SOLUK,
+    backgroundColor: SURFACE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  gorsel: {
-    width: 60,
-    height: 60,
+  avatarYazi: {
+    color: ALTIN,
+    fontSize: 17,
+    fontWeight: '400',
   },
   sonucBilgisi: {
     flex: 1,
-    gap: 4,
+    gap: 3,
   },
   sonucIsmi: {
     color: ALTIN,
-    fontSize: 18,
-    fontWeight: '300',
-    letterSpacing: 1,
-  },
-  sonucAltSatir: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  sonucPorsiyonu: {
-    color: ALTIN_ORTA_SOLUK,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '300',
     letterSpacing: 0.5,
   },
-  sonucMakrolari: {
+  sonucAlt: {
     color: ALTIN_ORTA_SOLUK,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '300',
     letterSpacing: 0.3,
   },
   sonucKalorisi: {
     color: ALTIN,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '400',
-    letterSpacing: 0.5,
+    letterSpacing: 0.3,
   },
 });

@@ -29,11 +29,24 @@ import { YEREL_BESIN_VERITABANI } from '@/data/foodDatabase';
 type Taban = { kalori: number; protein: number; karbonhidrat: number; yag: number };
 
 export default function OgunDuzenleScreen() {
-  const { id, besinId } = useLocalSearchParams<{ id?: string; besinId?: string }>();
-  const { ogunler, hizliKaloriEkle, ogunGuncelle } = useVeri();
+  const { id, besinId, yemekId, barkod, ad, k100, p100, c100, f100 } = useLocalSearchParams<{
+    id?: string;
+    besinId?: string;
+    yemekId?: string;
+    barkod?: string;
+    ad?: string;
+    k100?: string;
+    p100?: string;
+    c100?: string;
+    f100?: string;
+  }>();
+  const { ogunler, hizliKaloriEkle, ogunGuncelle, urunBul, urunEkle, turkYemekBul } = useVeri();
 
   const mevcutOgun = id ? ogunler.find((ogun) => ogun.id === id) : undefined;
   const besin = besinId ? YEREL_BESIN_VERITABANI.find((b) => b.id === besinId) : undefined;
+  const yemek = yemekId ? turkYemekBul(yemekId) : undefined;
+  const yerelUrun = barkod ? urunBul(barkod) : undefined;
+  const offKalori100 = k100 ? Number(k100) : 0;
   const duzenlemeMi = Boolean(mevcutOgun);
 
   const baslangic = useMemo(() => {
@@ -62,8 +75,49 @@ export default function OgunDuzenleScreen() {
       };
       return { taban, birim, miktar: String(miktar), isim: besin.isim, kalori: '' };
     }
+    if (yemek) {
+      const taban: Taban = {
+        kalori: yemek.kalori100 / 100,
+        protein: yemek.protein100 / 100,
+        karbonhidrat: yemek.karb100 / 100,
+        yag: yemek.yag100 / 100,
+      };
+      return {
+        taban,
+        birim: 'gram' as PorsiyonBirimi,
+        miktar: String(yemek.porsiyonGram),
+        isim: yemek.isim,
+        kalori: '',
+      };
+    }
+    if (offKalori100 > 0) {
+      const taban: Taban = {
+        kalori: offKalori100 / 100,
+        protein: (Number(p100) || 0) / 100,
+        karbonhidrat: (Number(c100) || 0) / 100,
+        yag: (Number(f100) || 0) / 100,
+      };
+      return {
+        taban,
+        birim: 'gram' as PorsiyonBirimi,
+        miktar: '100',
+        isim: ad ?? '',
+        kalori: '',
+      };
+    }
+    if (yerelUrun) {
+      const { birim, miktar } = porsiyonAyikla(yerelUrun.porsiyon);
+      const gram = Math.max(1, miktar * birimGram(birim));
+      const taban: Taban = {
+        kalori: yerelUrun.kalori / gram,
+        protein: yerelUrun.protein / gram,
+        karbonhidrat: yerelUrun.karbonhidrat / gram,
+        yag: yerelUrun.yag / gram,
+      };
+      return { taban, birim, miktar: String(miktar), isim: yerelUrun.isim, kalori: '' };
+    }
     return { taban: null as Taban | null, birim: 'porsiyon' as PorsiyonBirimi, miktar: '1', isim: '', kalori: '' };
-  }, [mevcutOgun, besin]);
+  }, [mevcutOgun, besin, yemek, offKalori100, p100, c100, f100, ad, yerelUrun]);
 
   const [isim, setIsim] = useState(baslangic.isim);
   const [birim, setBirim] = useState<PorsiyonBirimi>(baslangic.birim);
@@ -113,6 +167,18 @@ export default function OgunDuzenleScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
       return;
+    }
+
+    if (barkod) {
+      urunEkle({
+        barkod,
+        isim: isim.trim() || 'Barkodlu Ürün',
+        kalori: hesaplanan.kalori,
+        protein: hesaplanan.protein,
+        karbonhidrat: hesaplanan.karbonhidrat,
+        yag: hesaplanan.yag,
+        porsiyon: makrolar.porsiyon,
+      });
     }
 
     hizliKaloriEkle(hesaplanan.kalori, isim, makrolar);

@@ -3,7 +3,16 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo, useRef, useState } from 'react';
-import { Alert, Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  Alert,
+  Animated,
+  Linking,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader, SCREEN_HEADER_ICERIK_YUKSEKLIGI } from '@/components/screen-header';
@@ -95,7 +104,16 @@ function LuksToggle({ etiket, aciklama, deger, onDegisti }: LuksToggleProps) {
 }
 
 export default function SettingsScreen() {
-  const { kullanici, profilKaydet } = useVeri();
+  const {
+    kullanici,
+    profilKaydet,
+    saglikAktif,
+    saglikIzni,
+    saglikPlatformDestekli,
+    saglikDemo,
+    saglikBaslat,
+    saglikDurdur,
+  } = useVeri();
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
   const [suHatirlaticisi, setSuHatirlaticisi] = useState(true);
@@ -137,12 +155,21 @@ export default function SettingsScreen() {
   };
 
   const premiumaGec = () => {
-    Alert.alert('Çok Yakında', 'Premium deneyim kapıda, sabırsızlanıyoruz!');
+    router.push('/paywall');
   };
 
   const gecmiseGit = () => {
     router.push('/(tabs)/history');
   };
+
+  const saglikDurumMetni =
+    saglikIzni === 'verildi'
+      ? saglikDemo
+        ? 'Bağlı (demo verisi). Adım, aktif enerji ve kilo okunuyor; öğün ve su yazılıyor.'
+        : 'Bağlı. Adım, aktif enerji ve kilo okunuyor; öğün ve su yazılıyor.'
+      : saglikIzni === 'reddedildi'
+        ? 'İzin reddedildi. Uygulama Apple Health olmadan da sorunsuz çalışır.'
+        : 'Bağlantı kapalı. Açtığında izin isteyeceğiz.';
 
   const profiliKaydet = () => {
     const sonuc = profilDogrula({
@@ -294,6 +321,58 @@ export default function SettingsScreen() {
         <Text style={stiller.kaydetButonuYazisi}>Profili Kaydet</Text>
       </Pressable>
 
+      <Pressable onPress={() => router.push('/kilo-ekle')} style={stiller.kiloButonu}>
+        <View style={stiller.gecmisIkonKutusu}>
+          <MaterialCommunityIcons name="scale-bathroom" size={20} color={ALTIN} />
+        </View>
+        <View style={stiller.gecmisMetinAlani}>
+          <Text style={stiller.gecmisBasligi}>Kilo Kaydı Ekle</Text>
+          <Text style={stiller.gecmisAciklamasi}>Bugünkü kilonu gir, trendi Analiz&apos;de gör</Text>
+        </View>
+        <MaterialCommunityIcons name="chevron-right" size={22} color={ALTIN_ORTA_SOLUK} />
+      </Pressable>
+
+      <Text style={stiller.bolumBasligi}>Apple Health</Text>
+      <View style={stiller.hatirlaticiKarti}>
+        {saglikPlatformDestekli ? (
+          <LuksToggle
+            key={saglikAktif ? 'saglik-acik' : 'saglik-kapali'}
+            etiket="Apple Health Bağlantısı"
+            aciklama="Adım ve aktif enerjiyi oku, öğün ve suyu yaz"
+            deger={saglikAktif}
+            onDegisti={(acik) => {
+              if (acik) {
+                saglikBaslat();
+              } else {
+                saglikDurdur();
+              }
+            }}
+          />
+        ) : (
+          <View style={stiller.saglikPasifSatiri}>
+            <View style={stiller.iletisimMetinAlani}>
+              <Text style={stiller.toggleEtiket}>Apple Health Bağlantısı</Text>
+              <Text style={stiller.toggleAciklama}>Bu cihazda / bu derlemede kullanılamıyor</Text>
+            </View>
+            <MaterialCommunityIcons name="heart-off-outline" size={20} color={ALTIN_ORTA_SOLUK} />
+          </View>
+        )}
+
+        {saglikPlatformDestekli ? (
+          <>
+            <View style={stiller.toggleAyraci} />
+            <Text style={stiller.saglikDurum}>{saglikDurumMetni}</Text>
+            {saglikIzni === 'reddedildi' ? (
+              <Pressable
+                onPress={() => Linking.openURL('x-apple-health://')}
+                style={stiller.saglikLink}>
+                <Text style={stiller.saglikLinkYazisi}>Sağlık uygulamasında izin ver</Text>
+              </Pressable>
+            ) : null}
+          </>
+        ) : null}
+      </View>
+
       <Text style={stiller.bolumBasligi}>Hatırlatıcılar</Text>
       <View style={stiller.hatirlaticiKarti}>
         <LuksToggle
@@ -364,6 +443,18 @@ const stiller = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 12,
     elevation: 6,
+  },
+  kiloButonu: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    borderWidth: 1,
+    borderColor: ALTIN_COK_SOLUK,
+    backgroundColor: 'rgba(232,195,124,0.04)',
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 32,
   },
   gecmisIkonKutusu: {
     width: 38,
@@ -560,6 +651,28 @@ const stiller = StyleSheet.create({
   toggleAyraci: {
     height: StyleSheet.hairlineWidth,
     backgroundColor: ALTIN_COK_SOLUK,
+  },
+  saglikPasifSatiri: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+  },
+  saglikDurum: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 12,
+    fontWeight: '300',
+    lineHeight: 17,
+    paddingVertical: 12,
+  },
+  saglikLink: {
+    paddingBottom: 12,
+  },
+  saglikLinkYazisi: {
+    color: ALTIN,
+    fontSize: 13,
+    fontWeight: '400',
+    textDecorationLine: 'underline',
   },
   toggleMetinAlani: {
     flex: 1,

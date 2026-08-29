@@ -53,6 +53,12 @@ export default function RootLayout() {
               name="ogun-duzenle"
               options={{ presentation: 'modal', headerShown: false }}
             />
+            <Stack.Screen
+              name="kilo-ekle"
+              options={{ presentation: 'modal', headerShown: false }}
+            />
+            <Stack.Screen name="barkod" options={{ presentation: 'modal', headerShown: false }} />
+            <Stack.Screen name="paywall" options={{ presentation: 'modal', headerShown: false }} />
             <Stack.Screen name="search" options={{ headerShown: false }} />
             <Stack.Screen
               name="onboarding"

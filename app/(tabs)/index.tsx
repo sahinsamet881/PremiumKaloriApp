@@ -4,16 +4,7 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { ReactNode, useCallback, useEffect, useState } from 'react';
-import {
-  Alert,
-  Pressable,
-  ScrollView,
-  StyleProp,
-  StyleSheet,
-  Text,
-  View,
-  ViewStyle,
-} from 'react-native';
+import { Pressable, ScrollView, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -119,7 +110,8 @@ const SU_HEDEFI_ML = 2500;
 const SU_ARTIS_ML = 250;
 
 export default function TodayScreen() {
-  const { kullanici, ogunler, onboardingTamamlandi, girisYapildi, dunuKopyala } = useVeri();
+  const { kullanici, ogunler, onboardingTamamlandi, girisYapildi, saglikAktifKalori, saglikSuKaydet } =
+    useVeri();
   const [gununIpucu] = useState(
     () => GUNUN_IPUCLARI[Math.floor(Math.random() * GUNUN_IPUCLARI.length)]
   );
@@ -156,21 +148,11 @@ export default function TodayScreen() {
   const suEkle = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSuMiktari((onceki) => onceki + SU_ARTIS_ML);
+    saglikSuKaydet(SU_ARTIS_ML);
   };
 
   const tarihKaydir = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-  };
-
-  const dunuKopyalaBas = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const sayi = dunuKopyala();
-    if (sayi === 0) {
-      Alert.alert('Dün Boş', 'Dün eklenmiş bir öğün bulunamadı.');
-      return;
-    }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert('Kopyalandı', `Dünün ${sayi} öğünü bugüne eklendi.`);
   };
 
   const alinanMakrolar = ogunler.reduce(
@@ -199,11 +181,6 @@ export default function TodayScreen() {
       <ScreenHeader baslik="Bugün" />
       <SafeAreaView style={styles.kok}>
         <View style={styles.panel}>
-          <Pressable onPress={dunuKopyalaBas} style={styles.dunKopyalaButonu}>
-            <MaterialCommunityIcons name="content-copy" size={14} color={ALTIN} />
-            <Text style={styles.dunKopyalaYazisi}>Dünü Kopyala</Text>
-          </Pressable>
-
           <View style={[styles.kutu, styles.ogunlerKutusu]}>
             <View style={styles.ogunlerBaslikSatiri}>
               <View style={styles.tarihNavigator}>
@@ -223,6 +200,12 @@ export default function TodayScreen() {
 
             <View style={styles.ozetAlani}>
               <CalorieRing size={144} strokeWidth={12} />
+              {saglikAktifKalori > 0 ? (
+                <View style={styles.aktiviteSatiri}>
+                  <MaterialCommunityIcons name="fire" size={13} color={ALTIN} />
+                  <Text style={styles.aktiviteYazisi}>+{saglikAktifKalori} kcal aktivite</Text>
+                </View>
+              ) : null}
               <View style={styles.makroSatiri}>
                 <MakroKutu
                   etiket="Protein"
@@ -299,25 +282,6 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     gap: 14,
   },
-  dunKopyalaButonu: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    alignSelf: 'center',
-    borderWidth: 1,
-    borderColor: ALTIN_SOLUK,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    marginTop: -4,
-  },
-  dunKopyalaYazisi: {
-    color: ALTIN,
-    fontSize: 12,
-    fontWeight: '400',
-    letterSpacing: 0.3,
-  },
   kutu: {
     backgroundColor: SIYAH,
     borderWidth: 1,
@@ -374,6 +338,18 @@ const styles = StyleSheet.create({
     gap: 14,
     marginTop: 14,
     marginBottom: 6,
+  },
+  aktiviteSatiri: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: -4,
+  },
+  aktiviteYazisi: {
+    color: ALTIN,
+    fontSize: 12,
+    fontWeight: '400',
+    letterSpacing: 0.3,
   },
   makroSatiri: {
     flexDirection: 'row',

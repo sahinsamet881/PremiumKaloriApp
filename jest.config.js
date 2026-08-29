@@ -1,6 +1,6 @@
 module.exports = {
   testEnvironment: 'node',
-  testMatch: ['**/validation/**/*.test.ts'],
+  testMatch: ['**/(validation|data|nutrition)/**/*.test.ts'],
   transform: {
     '^.+\\.ts$': ['ts-jest', { tsconfig: { module: 'commonjs' } }],
   },

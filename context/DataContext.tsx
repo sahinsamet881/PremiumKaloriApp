@@ -1,15 +1,33 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
+import {
+  TurkYemek,
+  TURK_YEMEK_VERI_VERSIYONU,
+  TURK_YEMEKLERI_SEED,
+} from '@/data/turkishFoods';
+import { saglik, SaglikGunlukVeri, SaglikIzinDurumu } from '@/health/saglik';
 import { useNotifications } from '@/hooks/useNotifications';
+import { magaza, PREMIUM_URUN, SatinAlmaSonucu } from '@/store/magaza';
 import {
   Favori,
   GecmisKaydi,
+  KiloKaydi,
   KullaniciVerisi,
   Makrolar,
   Ogun,
   ProfilBilgisi,
   SikKullanim,
+  YerelUrun,
 } from '@/types';
 
 const KULLANICI_ANAHTARI = '@minimalist_kalori/kullanici';
@@ -20,6 +38,16 @@ const GECMIS_ANAHTARI = '@minimalist_kalori/ogun_gecmisi';
 
 const FAVORI_ANAHTARI = '@minimalist_kalori/favoriler';
 
+const KILO_ANAHTARI = '@minimalist_kalori/kilo_kayitlari';
+
+const YEREL_URUN_ANAHTARI = '@minimalist_kalori/yerel_urunler';
+
+const YEMEK_DB_ANAHTARI = '@minimalist_kalori/turk_yemekleri';
+
+const YEMEK_DB_VER_ANAHTARI = '@minimalist_kalori/turk_yemekleri_versiyon';
+
+const SAGLIK_AKTIF_ANAHTARI = '@minimalist_kalori/saglik_aktif';
+
 const MS_CINSINDEN_GUN = 1000 * 60 * 60 * 24;
 
 const GECMIS_SAKLAMA_GUN = 45;
@@ -28,13 +56,6 @@ const SIK_KULLANIM_PENCERE_GUN = 30;
 
 function normalizeIsim(isim: string) {
   return isim.trim().toLocaleLowerCase('tr-TR');
-}
-
-function saatDamgasi() {
-  const simdi = new Date();
-  const saat = String(simdi.getHours()).padStart(2, '0');
-  const dakika = String(simdi.getMinutes()).padStart(2, '0');
-  return `${saat}:${dakika}`;
 }
 
 function bugununTarihiUret() {
@@ -67,11 +88,30 @@ type VeriBaglami = {
   ) => void;
   ogunKopyala: (id: string) => void;
   ogunSil: (id: string) => void;
+  ogunGecmisi: GecmisKaydi[];
   sikKullanilanlar: SikKullanim[];
   favoriler: Favori[];
   favoriMi: (isim: string) => boolean;
   favoriToggle: (isim: string, kalori: number, makrolar?: Makrolar) => void;
-  dunuKopyala: () => number;
+  kiloKayitlari: KiloKaydi[];
+  kiloEkle: (kilo: number, not?: string) => void;
+  urunBul: (barkod: string) => YerelUrun | undefined;
+  urunEkle: (urun: YerelUrun) => void;
+  turkYemekleri: TurkYemek[];
+  turkYemekBul: (id: string) => TurkYemek | undefined;
+  saglikAktif: boolean;
+  saglikIzni: SaglikIzinDurumu;
+  saglikPlatformDestekli: boolean;
+  saglikDemo: boolean;
+  saglikAktifKalori: number;
+  saglikBaslat: () => Promise<void>;
+  saglikDurdur: () => void;
+  saglikSuKaydet: (mililitre: number) => void;
+  premiumAktif: boolean;
+  premiumMagazaHazir: boolean;
+  premiumDenemeBitis: number | null;
+  premiumSatinAl: () => Promise<SatinAlmaSonucu>;
+  premiumGeriYukle: () => Promise<boolean>;
   profilKaydet: (profil: ProfilBilgisi) => void;
   profilSifirla: () => void;
   girisYap: () => void;
@@ -108,7 +148,20 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [girisYapildi, setGirisYapildi] = useState<boolean | null>(null);
   const [ogunGecmisi, setOgunGecmisi] = useState<GecmisKaydi[]>([]);
   const [favoriler, setFavoriler] = useState<Favori[]>([]);
-  const { hatirlaticiKur } = useNotifications();
+  const [kiloKayitlari, setKiloKayitlari] = useState<KiloKaydi[]>([]);
+  const [yerelUrunler, setYerelUrunler] = useState<Record<string, YerelUrun>>({});
+  const [turkYemekleri, setTurkYemekleri] = useState<TurkYemek[]>(TURK_YEMEKLERI_SEED);
+  const [saglikAktif, setSaglikAktif] = useState(false);
+  const [saglikIzni, setSaglikIzni] = useState<SaglikIzinDurumu>('bilinmiyor');
+  const [saglikGunluk, setSaglikGunluk] = useState<SaglikGunlukVeri>({
+    adim: 0,
+    aktifKalori: 0,
+    kilo: null,
+  });
+  const saglikAktifRef = useRef(false);
+  const [premiumAktif, setPremiumAktif] = useState(false);
+  const [premiumDenemeBitis, setPremiumDenemeBitis] = useState<number | null>(null);
+  const { hatirlaticiKur, denemeHatirlaticisiKur } = useNotifications();
 
   useEffect(() => {
     const baslangicYukle = async () => {
@@ -126,6 +179,50 @@ export function DataProvider({ children }: { children: ReactNode }) {
       const favoriJson = await AsyncStorage.getItem(FAVORI_ANAHTARI);
       if (favoriJson) {
         setFavoriler(JSON.parse(favoriJson));
+      }
+
+      const kiloJson = await AsyncStorage.getItem(KILO_ANAHTARI);
+      if (kiloJson) {
+        setKiloKayitlari(JSON.parse(kiloJson));
+      }
+
+      const urunJson = await AsyncStorage.getItem(YEREL_URUN_ANAHTARI);
+      if (urunJson) {
+        setYerelUrunler(JSON.parse(urunJson));
+      }
+
+      magaza
+        .abonelikDurumu()
+        .then((durum) => {
+          setPremiumAktif(durum.aktif);
+          setPremiumDenemeBitis(durum.denemeBitisMs);
+          if (durum.denemede) {
+            denemeHatirlaticisiKur(durum.denemeBitisMs);
+          }
+        })
+        .catch(() => {});
+
+      const saglikTercihi = await AsyncStorage.getItem(SAGLIK_AKTIF_ANAHTARI);
+      if (saglikTercihi === 'true') {
+        const durum = await saglik.izinDurumu();
+        setSaglikIzni(durum);
+        if (durum === 'verildi') {
+          saglikAktifRef.current = true;
+          setSaglikAktif(true);
+          setSaglikGunluk(await saglik.gunlukVeriGetir());
+        }
+      }
+
+      const yemekVer = await AsyncStorage.getItem(YEMEK_DB_VER_ANAHTARI);
+      if (Number(yemekVer) === TURK_YEMEK_VERI_VERSIYONU) {
+        const yemekJson = await AsyncStorage.getItem(YEMEK_DB_ANAHTARI);
+        if (yemekJson) {
+          setTurkYemekleri(JSON.parse(yemekJson));
+        }
+      } else {
+        setTurkYemekleri(TURK_YEMEKLERI_SEED);
+        AsyncStorage.setItem(YEMEK_DB_ANAHTARI, JSON.stringify(TURK_YEMEKLERI_SEED));
+        AsyncStorage.setItem(YEMEK_DB_VER_ANAHTARI, String(TURK_YEMEK_VERI_VERSIYONU));
       }
 
       const bugun = bugununTarihiUret();
@@ -163,7 +260,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     };
 
     baslangicYukle();
-  }, []);
+  }, [denemeHatirlaticisiKur]);
 
   const profilKaydet = useCallback((profil: ProfilBilgisi) => {
     setKullanici((onceki) => {
@@ -179,12 +276,104 @@ export function DataProvider({ children }: { children: ReactNode }) {
     AsyncStorage.removeItem(GIRIS_ANAHTARI);
     AsyncStorage.removeItem(GECMIS_ANAHTARI);
     AsyncStorage.removeItem(FAVORI_ANAHTARI);
+    AsyncStorage.removeItem(KILO_ANAHTARI);
+    AsyncStorage.removeItem(YEREL_URUN_ANAHTARI);
+    AsyncStorage.removeItem(SAGLIK_AKTIF_ANAHTARI);
+    saglikAktifRef.current = false;
+    setSaglikAktif(false);
+    setSaglikIzni('bilinmiyor');
     setKullanici(BASLANGIC_KULLANICISI);
     setOgunler(BASLANGIC_OGUNLERI);
     setOgunGecmisi([]);
     setFavoriler([]);
+    setKiloKayitlari([]);
+    setYerelUrunler({});
     setOnboardingTamamlandi(false);
     setGirisYapildi(false);
+  }, []);
+
+  const urunBul = useCallback(
+    (barkod: string) => yerelUrunler[barkod],
+    [yerelUrunler]
+  );
+
+  const urunEkle = useCallback((urun: YerelUrun) => {
+    setYerelUrunler((onceki) => {
+      const guncel = { ...onceki, [urun.barkod]: urun };
+      AsyncStorage.setItem(YEREL_URUN_ANAHTARI, JSON.stringify(guncel));
+      return guncel;
+    });
+  }, []);
+
+  const turkYemekBul = useCallback(
+    (id: string) => turkYemekleri.find((yemek) => yemek.id === id),
+    [turkYemekleri]
+  );
+
+  const saglikBaslat = useCallback(async () => {
+    const durum = await saglik.izinIste();
+    setSaglikIzni(durum);
+    if (durum === 'verildi') {
+      saglikAktifRef.current = true;
+      setSaglikAktif(true);
+      AsyncStorage.setItem(SAGLIK_AKTIF_ANAHTARI, 'true');
+      setSaglikGunluk(await saglik.gunlukVeriGetir());
+    } else {
+      saglikAktifRef.current = false;
+      setSaglikAktif(false);
+      AsyncStorage.setItem(SAGLIK_AKTIF_ANAHTARI, 'false');
+    }
+  }, []);
+
+  const saglikDurdur = useCallback(() => {
+    saglikAktifRef.current = false;
+    setSaglikAktif(false);
+    AsyncStorage.setItem(SAGLIK_AKTIF_ANAHTARI, 'false');
+  }, []);
+
+  const saglikSuKaydet = useCallback((mililitre: number) => {
+    if (saglikAktifRef.current) {
+      saglik.suYaz(mililitre);
+    }
+  }, []);
+
+  const premiumSatinAl = useCallback(async () => {
+    const sonuc = await magaza.satinAl(PREMIUM_URUN.kimlik);
+    if (sonuc === 'basarili') {
+      const durum = await magaza.abonelikDurumu();
+      setPremiumAktif(durum.aktif);
+      setPremiumDenemeBitis(durum.denemeBitisMs);
+      denemeHatirlaticisiKur(durum.denemeBitisMs);
+    }
+    return sonuc;
+  }, [denemeHatirlaticisiKur]);
+
+  const premiumGeriYukle = useCallback(async () => {
+    const durum = await magaza.abonelikDurumu();
+    setPremiumAktif(durum.aktif);
+    setPremiumDenemeBitis(durum.denemeBitisMs);
+    return durum.aktif;
+  }, []);
+
+  const kiloEkle = useCallback((kilo: number, not?: string) => {
+    if (!Number.isFinite(kilo) || kilo <= 0) {
+      return;
+    }
+    const bugun = bugununTarihiUret();
+    setKiloKayitlari((onceki) => {
+      const digerleri = onceki.filter((kayit) => kayit.tarih !== bugun);
+      const guncel = [
+        ...digerleri,
+        { id: String(Date.now()), tarih: bugun, kilo, not: not?.trim() || undefined },
+      ].sort((a, b) => a.tarih.localeCompare(b.tarih));
+      AsyncStorage.setItem(KILO_ANAHTARI, JSON.stringify(guncel));
+      return guncel;
+    });
+    setKullanici((onceki) => {
+      const guncel = { ...onceki, kilo };
+      AsyncStorage.setItem(KULLANICI_ANAHTARI, JSON.stringify(guncel));
+      return guncel;
+    });
   }, []);
 
   const gecmiseEkle = useCallback((kayitlar: GecmisKaydi[]) => {
@@ -226,6 +415,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       gecmiseEkle([
         { id: yeniOgun.id, isim: nihaiIsim, kalori, makrolar, zaman: simdi.getTime() },
       ]);
+      if (saglikAktifRef.current) {
+        saglik.beslenmeYaz({
+          kalori,
+          protein: makrolar?.protein ?? 0,
+          karbonhidrat: makrolar?.karbonhidrat ?? 0,
+          yag: makrolar?.yag ?? 0,
+        });
+      }
       hatirlaticiKur();
     },
     [hatirlaticiKur, gecmiseEkle]
@@ -285,54 +482,6 @@ export function DataProvider({ children }: { children: ReactNode }) {
     },
     [ogunler, gecmiseEkle]
   );
-
-  const dunuKopyala = useCallback(() => {
-    const simdi = new Date();
-    const dunBaslangic = new Date(
-      simdi.getFullYear(),
-      simdi.getMonth(),
-      simdi.getDate() - 1
-    ).getTime();
-    const bugunBaslangic = new Date(
-      simdi.getFullYear(),
-      simdi.getMonth(),
-      simdi.getDate()
-    ).getTime();
-
-    const dunkuler = ogunGecmisi.filter(
-      (kayit) => kayit.zaman >= dunBaslangic && kayit.zaman < bugunBaslangic
-    );
-    if (dunkuler.length === 0) {
-      return 0;
-    }
-
-    const saat = saatDamgasi();
-    const zaman = simdi.getTime();
-    const yeniOgunler: Ogun[] = dunkuler.map((kayit, sira) => ({
-      id: `${zaman + sira}`,
-      isim: kayit.isim,
-      kalori: kayit.kalori,
-      eklenmeSaati: saat,
-      makrolar: kayit.makrolar,
-    }));
-    const toplamKalori = dunkuler.reduce((toplam, kayit) => toplam + kayit.kalori, 0);
-
-    setOgunler((oncekiler) => [...oncekiler, ...yeniOgunler]);
-    setKullanici((onceki) => ({
-      ...onceki,
-      bugunAlinanKalori: onceki.bugunAlinanKalori + toplamKalori,
-    }));
-    gecmiseEkle(
-      yeniOgunler.map((ogun) => ({
-        id: ogun.id,
-        isim: ogun.isim,
-        kalori: ogun.kalori,
-        makrolar: ogun.makrolar,
-        zaman,
-      }))
-    );
-    return dunkuler.length;
-  }, [ogunGecmisi, gecmiseEkle]);
 
   const favoriMi = useCallback(
     (isim: string) => favoriler.some((favori) => normalizeIsim(favori.isim) === normalizeIsim(isim)),
@@ -400,11 +549,30 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ogunGuncelle,
       ogunKopyala,
       ogunSil,
+      ogunGecmisi,
       sikKullanilanlar,
       favoriler,
       favoriMi,
       favoriToggle,
-      dunuKopyala,
+      kiloKayitlari,
+      kiloEkle,
+      urunBul,
+      urunEkle,
+      turkYemekleri,
+      turkYemekBul,
+      saglikAktif,
+      saglikIzni,
+      saglikPlatformDestekli: saglik.platformDestekli,
+      saglikDemo: saglik.demo,
+      saglikAktifKalori: saglikAktif ? saglikGunluk.aktifKalori : 0,
+      saglikBaslat,
+      saglikDurdur,
+      saglikSuKaydet,
+      premiumAktif,
+      premiumMagazaHazir: magaza.hazir,
+      premiumDenemeBitis,
+      premiumSatinAl,
+      premiumGeriYukle,
       profilKaydet,
       profilSifirla,
       girisYap,
@@ -418,11 +586,27 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ogunGuncelle,
       ogunKopyala,
       ogunSil,
+      ogunGecmisi,
       sikKullanilanlar,
       favoriler,
       favoriMi,
       favoriToggle,
-      dunuKopyala,
+      kiloKayitlari,
+      kiloEkle,
+      urunBul,
+      urunEkle,
+      turkYemekleri,
+      turkYemekBul,
+      saglikAktif,
+      saglikIzni,
+      saglikGunluk,
+      saglikBaslat,
+      saglikDurdur,
+      saglikSuKaydet,
+      premiumAktif,
+      premiumDenemeBitis,
+      premiumSatinAl,
+      premiumGeriYukle,
       profilKaydet,
       profilSifirla,
       girisYap,

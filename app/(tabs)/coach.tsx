@@ -1,10 +1,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useBottomTabBarHeight } from '@react-navigation/bottom-tabs';
+import { fetch as akanFetch } from 'expo/fetch';
 import * as Haptics from 'expo-haptics';
+import * as Network from 'expo-network';
 import { StatusBar } from 'expo-status-bar';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,8 +19,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ScreenHeader, SCREEN_HEADER_ICERIK_YUKSEKLIGI } from '@/components/screen-header';
-import { GEMINI_API_KEY, KOC_MODELI } from '@/constants/ai';
-import { ALTIN, ALTIN_ORTA_SOLUK, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
+import {
+  GEMINI_API_KEY,
+  KOC_GUVENLIK_KURALLARI,
+  KOC_KISILIK,
+  KOC_MODELI,
+} from '@/constants/ai';
+import { ALTIN, ALTIN_ORTA_SOLUK, ALTIN_SOLUK, DANGER, SIYAH } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
 
 type Mesaj = {
@@ -27,6 +34,11 @@ type Mesaj = {
   metin: string;
 };
 
+type KocHatasi = 'ag' | 'sunucu' | 'rate_limit' | 'zaman_asimi';
+
+const SOHBET_ANAHTARI = '@minimalist_kalori/koc_sohbeti';
+const ISTEK_ZAMAN_ASIMI = 30000;
+
 const KARSILAMA_MESAJI: Mesaj = {
   id: 'karsilama',
   rol: 'koc',
@@ -34,56 +46,217 @@ const KARSILAMA_MESAJI: Mesaj = {
     'Merhaba! Ben senin yapay zeka diyet koçunum. Bugün ne yediğini, hedeflerini veya aklına takılan her şeyi bana sorabilirsin.',
 };
 
+const HATA_BILGI: Record<
+  KocHatasi,
+  { ikon: keyof typeof MaterialCommunityIcons.glyphMap; baslik: string; mesaj: string }
+> = {
+  ag: {
+    ikon: 'wifi-off',
+    baslik: 'İnternet Yok',
+    mesaj: 'Bağlantını kontrol edip tekrar dene.',
+  },
+  sunucu: {
+    ikon: 'server-network-off',
+    baslik: 'Sunucu Hatası',
+    mesaj: 'AI servisinde geçici bir sorun var. Birazdan tekrar dene.',
+  },
+  rate_limit: {
+    ikon: 'timer-sand',
+    baslik: 'Çok Fazla İstek',
+    mesaj: 'Kısa sürede çok soru soruldu. Bir dakika bekleyip tekrar dene.',
+  },
+  zaman_asimi: {
+    ikon: 'clock-alert-outline',
+    baslik: 'Zaman Aşımı',
+    mesaj: 'Yanıt çok uzun sürdü. Tekrar dener misin?',
+  },
+};
+
+function hataSinifla(hata: unknown, statusKodu?: number): KocHatasi {
+  if (statusKodu === 429) {
+    return 'rate_limit';
+  }
+  if (typeof statusKodu === 'number' && statusKodu >= 400) {
+    return 'sunucu';
+  }
+  const metin = String((hata as { message?: string })?.message ?? hata).toLowerCase();
+  if ((hata as { name?: string })?.name === 'AbortError' || metin.includes('abort')) {
+    return 'zaman_asimi';
+  }
+  if (
+    metin.includes('network') ||
+    metin.includes('fetch') ||
+    metin.includes('unreachable') ||
+    metin.includes('connection') ||
+    metin.includes('econn') ||
+    metin.includes('timed out')
+  ) {
+    return 'ag';
+  }
+  return 'sunucu';
+}
+
 export default function CoachScreen() {
-  const { kullanici, ogunler } = useVeri();
+  const { kullanici, ogunler, ogunGecmisi } = useVeri();
   const tabBarYuksekligi = useBottomTabBarHeight();
   const [mesajlar, setMesajlar] = useState<Mesaj[]>([KARSILAMA_MESAJI]);
   const [girdi, setGirdi] = useState('');
   const [yaziliyor, setYaziliyor] = useState(false);
+  const [sonHata, setSonHata] = useState<KocHatasi | null>(null);
+  const [sonSoru, setSonSoru] = useState('');
+  const [cevrimici, setCevrimici] = useState(true);
   const kaydiriciRef = useRef<ScrollView>(null);
+  const yuklendiRef = useRef(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const kayit = await AsyncStorage.getItem(SOHBET_ANAHTARI);
+        if (kayit) {
+          const cozulen: Mesaj[] = JSON.parse(kayit);
+          if (Array.isArray(cozulen) && cozulen.length > 0) {
+            setMesajlar(cozulen);
+          }
+        }
+      } catch {
+        // sohbet yüklenemedi, karşılama ile devam
+      }
+      yuklendiRef.current = true;
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!yuklendiRef.current) {
+      return;
+    }
+    AsyncStorage.setItem(SOHBET_ANAHTARI, JSON.stringify(mesajlar.slice(-60))).catch(() => {});
+  }, [mesajlar]);
+
+  useEffect(() => {
+    Network.getNetworkStateAsync()
+      .then((durum) => setCevrimici(durum.isInternetReachable ?? durum.isConnected ?? true))
+      .catch(() => {});
+    const abone = Network.addNetworkStateListener((durum) => {
+      setCevrimici(durum.isInternetReachable ?? durum.isConnected ?? true);
+    });
+    return () => abone.remove();
+  }, []);
+
+  const yediGunKaloriOrt = useMemo(() => {
+    const esik = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const gunToplam = new Map<string, number>();
+    for (const kayit of ogunGecmisi) {
+      if (kayit.zaman < esik) {
+        continue;
+      }
+      const gun = new Date(kayit.zaman).toISOString().slice(0, 10);
+      gunToplam.set(gun, (gunToplam.get(gun) ?? 0) + kayit.kalori);
+    }
+    const degerler = [...gunToplam.values()];
+    if (degerler.length === 0) {
+      return 0;
+    }
+    return Math.round(degerler.reduce((a, b) => a + b, 0) / degerler.length);
+  }, [ogunGecmisi]);
 
   const sistemTalimati = useMemo(() => {
     const alinanKalori = ogunler.reduce((toplam, ogun) => toplam + ogun.kalori, 0);
-    const ogunOzeti =
+    const makro = ogunler.reduce(
+      (toplam, ogun) =>
+        ogun.makrolar
+          ? {
+              p: toplam.p + ogun.makrolar.protein,
+              k: toplam.k + ogun.makrolar.karbonhidrat,
+              y: toplam.y + ogun.makrolar.yag,
+            }
+          : toplam,
+      { p: 0, k: 0, y: 0 }
+    );
+    const ogunListesi =
       ogunler.length > 0
-        ? ogunler.map((ogun) => `${ogun.isim} (${ogun.kalori} kcal)`).join(', ')
-        : 'henüz bir şey eklenmedi';
+        ? ogunler.map((ogun) => `- ${ogun.isim}: ${ogun.kalori} kcal`).join('\n')
+        : '- (bugün henüz öğün eklenmedi)';
 
     return [
-      'Sen "AI Koç" adında, sıcak ama net konuşan bir yapay zeka diyet koçusun.',
-      'Kısa, uygulanabilir ve motive edici yanıtlar ver; gerektiğinde madde işareti kullan.',
-      'Tıbbi teşhis koyma; ciddi durumlarda bir uzmana danışmayı öner.',
-      `Kullanıcı: ${kullanici.isim || 'isimsiz'}, ${kullanici.yas} yaş, ${kullanici.boy} cm, ${kullanici.kilo} kg, hedef ${kullanici.hedefKilo} kg.`,
-      `Günlük kalori hedefi ${kullanici.gunlukHedefKalori} kcal. Makro hedefleri: Protein ${kullanici.makroHedefleri.protein}g, Karbonhidrat ${kullanici.makroHedefleri.karbonhidrat}g, Yağ ${kullanici.makroHedefleri.yag}g.`,
-      `Bugün alınan toplam ${alinanKalori} kcal. Bugünün öğünleri: ${ogunOzeti}.`,
-    ].join('\n');
-  }, [kullanici, ogunler]);
+      KOC_KISILIK,
+      KOC_GUVENLIK_KURALLARI,
+      '--- KULLANICI ÖZETİ ---',
+      `Yaş ${kullanici.yas}, boy ${kullanici.boy} cm, kilo ${kullanici.kilo} kg, hedef kilo ${kullanici.hedefKilo} kg.`,
+      `Günlük kalori hedefi: ${kullanici.gunlukHedefKalori} kcal (Protein ${kullanici.makroHedefleri.protein}g / Karbonhidrat ${kullanici.makroHedefleri.karbonhidrat}g / Yağ ${kullanici.makroHedefleri.yag}g).`,
+      `Bugün toplam: ${alinanKalori} kcal — Protein ${Math.round(makro.p)}g, Karbonhidrat ${Math.round(makro.k)}g, Yağ ${Math.round(makro.y)}g.`,
+      `Bugünün öğünleri:\n${ogunListesi}`,
+      `Son 7 günün günlük kalori ortalaması: ${
+        yediGunKaloriOrt > 0 ? `${yediGunKaloriOrt} kcal` : 'yeterli veri yok'
+      }.`,
+    ].join('\n\n');
+  }, [kullanici, ogunler, yediGunKaloriOrt]);
 
-  const gonder = async () => {
-    const metin = girdi.trim();
-    if (metin.length === 0 || yaziliyor) {
+  const gonder = async (yeniden = false) => {
+    if (yaziliyor || !cevrimici) {
+      return;
+    }
+    const metin = (yeniden ? sonSoru : girdi).trim();
+    if (metin.length === 0) {
       return;
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSonHata(null);
 
-    const kullaniciMesaji: Mesaj = { id: String(Date.now()), rol: 'kullanici', metin };
-    const guncelGecmis = [...mesajlar, kullaniciMesaji];
-    setMesajlar(guncelGecmis);
-    setGirdi('');
+    let calismaGecmisi = mesajlar;
+    if (!yeniden) {
+      const kullaniciMesaji: Mesaj = { id: `${Date.now()}-k`, rol: 'kullanici', metin };
+      calismaGecmisi = [...mesajlar, kullaniciMesaji];
+      setMesajlar(calismaGecmisi);
+      setGirdi('');
+      setSonSoru(metin);
+    }
     setYaziliyor(true);
 
+    const kocId = `${Date.now()}-c`;
+    let biriken = '';
+    let placeholderVar = false;
+    const kontrolcu = new AbortController();
+    const zamanlayici = setTimeout(() => kontrolcu.abort(), ISTEK_ZAMAN_ASIMI);
+
+    const isleParca = (json: string) => {
+      if (!json || json === '[DONE]') {
+        return;
+      }
+      try {
+        const parca = JSON.parse(json);
+        const ek: string = parca?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+        if (!ek) {
+          return;
+        }
+        biriken += ek;
+        if (!placeholderVar) {
+          placeholderVar = true;
+          setMesajlar((onceki) => [...onceki, { id: kocId, rol: 'koc', metin: biriken }]);
+        } else {
+          setMesajlar((onceki) =>
+            onceki.map((mesaj) => (mesaj.id === kocId ? { ...mesaj, metin: biriken } : mesaj))
+          );
+        }
+      } catch {
+        // eksik/parçalı json satırı, sıradaki chunk'ta tamamlanır
+      }
+    };
+
     try {
-      let kesit = guncelGecmis.filter((mesaj) => mesaj.id !== KARSILAMA_MESAJI.id).slice(-12);
+      let kesit = calismaGecmisi
+        .filter((mesaj) => mesaj.id !== KARSILAMA_MESAJI.id && mesaj.metin.trim().length > 0)
+        .slice(-12);
       while (kesit.length > 0 && kesit[0].rol === 'koc') {
         kesit = kesit.slice(1);
       }
 
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${KOC_MODELI}:generateContent?key=${GEMINI_API_KEY}`,
+      const yanit = await akanFetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${KOC_MODELI}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: kontrolcu.signal,
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: sistemTalimati }] },
             contents: kesit.map((mesaj) => ({
@@ -94,49 +267,77 @@ export default function CoachScreen() {
           }),
         }
       );
+      clearTimeout(zamanlayici);
 
-      if (!response.ok) {
-        const hataGovdesi = await response.text();
-        throw new Error(hataGovdesi);
+      if (!yanit.ok) {
+        const govde = await yanit.text().catch(() => '');
+        const hata = new Error(govde || `HTTP ${yanit.status}`) as Error & { status: number };
+        hata.status = yanit.status;
+        throw hata;
       }
 
-      const data = await response.json();
-      const cevap = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (yanit.body) {
+        const okuyucu = yanit.body.getReader();
+        const cozucu = new TextDecoder();
+        let tampon = '';
+        for (;;) {
+          const { done, value } = await okuyucu.read();
+          if (done) {
+            break;
+          }
+          tampon += cozucu.decode(value, { stream: true });
+          const satirlar = tampon.split('\n');
+          tampon = satirlar.pop() ?? '';
+          for (const satir of satirlar) {
+            const s = satir.trim();
+            if (s.startsWith('data:')) {
+              isleParca(s.slice(5).trim());
+            }
+          }
+        }
+        const kalan = tampon.trim();
+        if (kalan.startsWith('data:')) {
+          isleParca(kalan.slice(5).trim());
+        }
+      } else {
+        const tumMetin = await yanit.text();
+        for (const satir of tumMetin.split('\n')) {
+          const s = satir.trim();
+          if (s.startsWith('data:')) {
+            isleParca(s.slice(5).trim());
+          }
+        }
+      }
 
-      setMesajlar((onceki) => [
-        ...onceki,
-        {
-          id: `${Date.now()}-koc`,
-          rol: 'koc',
-          metin:
-            cevap && cevap.length > 0
-              ? cevap
-              : 'Şu an bir yanıt oluşturamadım, sorunu biraz farklı sorar mısın?',
-        },
-      ]);
-    } catch (error: any) {
-      console.error('AI Koç Hatası:', error);
-      setMesajlar((onceki) => [
-        ...onceki,
-        {
-          id: `${Date.now()}-hata`,
-          rol: 'koc',
-          metin: 'Bağlantı kurulamadı. Birazdan tekrar dener misin?',
-        },
-      ]);
+      if (biriken.trim().length === 0) {
+        const yedek = 'Şu an bir yanıt oluşturamadım, sorunu biraz farklı sorar mısın?';
+        setMesajlar((onceki) => {
+          if (onceki.some((mesaj) => mesaj.id === kocId)) {
+            return onceki.map((mesaj) => (mesaj.id === kocId ? { ...mesaj, metin: yedek } : mesaj));
+          }
+          return [...onceki, { id: kocId, rol: 'koc', metin: yedek }];
+        });
+      }
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch (hata) {
+      clearTimeout(zamanlayici);
+      console.error('AI Koç Hatası:', hata);
+      setMesajlar((onceki) => onceki.filter((mesaj) => mesaj.id !== kocId));
+      setSonHata(hataSinifla(hata, (hata as { status?: number })?.status));
     } finally {
       setYaziliyor(false);
     }
   };
 
-  const gonderilemez = girdi.trim().length === 0 || yaziliyor;
+  const gonderilemez = !cevrimici || yaziliyor || girdi.trim().length === 0;
+  const altBaslik = !cevrimici ? 'çevrimdışı' : yaziliyor ? 'yazıyor...' : 'çevrimiçi';
 
   return (
     <View style={stiller.kok}>
       <StatusBar style="light" />
       <ScreenHeader
         baslik="AI Koç"
-        altBaslik={yaziliyor ? 'yazıyor...' : 'çevrimiçi'}
+        altBaslik={altBaslik}
         sag={
           <View style={stiller.betaRozeti}>
             <Text style={stiller.betaYazisi}>BETA</Text>
@@ -181,34 +382,62 @@ export default function CoachScreen() {
               </View>
             ))}
 
-            {yaziliyor ? (
+            {yaziliyor && !mesajlar.some((m) => m.id.endsWith('-c') && m.metin.length > 0) ? (
               <View style={[stiller.balonSatiri, stiller.balonSatiriSol]}>
                 <View style={[stiller.balon, stiller.balonKoc, stiller.yaziyorBalonu]}>
-                  <ActivityIndicator size="small" color={ALTIN} />
                   <Text style={stiller.yaziyorYazi}>Koç düşünüyor...</Text>
+                </View>
+              </View>
+            ) : null}
+
+            {sonHata ? (
+              <View style={[stiller.balonSatiri, stiller.balonSatiriSol]}>
+                <View style={stiller.hataKarti}>
+                  <MaterialCommunityIcons
+                    name={HATA_BILGI[sonHata].ikon}
+                    size={22}
+                    color={DANGER}
+                  />
+                  <Text style={stiller.hataBaslik}>{HATA_BILGI[sonHata].baslik}</Text>
+                  <Text style={stiller.hataMetin}>{HATA_BILGI[sonHata].mesaj}</Text>
+                  <Pressable onPress={() => gonder(true)} style={stiller.tekrarButonu}>
+                    <MaterialCommunityIcons name="refresh" size={14} color={SIYAH} />
+                    <Text style={stiller.tekrarYazisi}>Tekrar Dene</Text>
+                  </Pressable>
                 </View>
               </View>
             ) : null}
           </ScrollView>
 
           <View style={stiller.girdiAlani}>
-            <TextInput
-              style={stiller.girdi}
-              value={girdi}
-              onChangeText={setGirdi}
-              placeholder="Koçuna bir şey sor..."
-              placeholderTextColor={ALTIN_SOLUK}
-              selectionColor={ALTIN}
-              multiline
-              maxLength={500}
-              textAlignVertical="center"
-            />
-            <Pressable
-              onPress={gonder}
-              disabled={gonderilemez}
-              style={[stiller.gonderButonu, gonderilemez ? stiller.gonderButonuPasif : null]}>
-              <MaterialCommunityIcons name="arrow-up" size={22} color={SIYAH} />
-            </Pressable>
+            {!cevrimici ? (
+              <View style={stiller.cevrimdisiSerit}>
+                <MaterialCommunityIcons name="wifi-off" size={13} color={ALTIN_ORTA_SOLUK} />
+                <Text style={stiller.cevrimdisiYazi}>
+                  Çevrimdışısın — AI Koç internet gerektirir. Öğün ve su kaydı çalışmaya devam eder.
+                </Text>
+              </View>
+            ) : null}
+            <View style={stiller.girdiSatiri}>
+              <TextInput
+                style={[stiller.girdi, !cevrimici ? stiller.girdiPasif : null]}
+                value={girdi}
+                onChangeText={setGirdi}
+                editable={cevrimici && !yaziliyor}
+                placeholder={cevrimici ? 'Koçuna bir şey sor...' : 'Bağlantı bekleniyor...'}
+                placeholderTextColor={ALTIN_SOLUK}
+                selectionColor={ALTIN}
+                multiline
+                maxLength={500}
+                textAlignVertical="center"
+              />
+              <Pressable
+                onPress={() => gonder(false)}
+                disabled={gonderilemez}
+                style={[stiller.gonderButonu, gonderilemez ? stiller.gonderButonuPasif : null]}>
+                <MaterialCommunityIcons name="arrow-up" size={22} color={SIYAH} />
+              </Pressable>
+            </View>
           </View>
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -290,16 +519,70 @@ const stiller = StyleSheet.create({
     fontSize: 13,
     fontWeight: '300',
   },
-  girdiAlani: {
+  hataKarti: {
+    maxWidth: '86%',
+    borderWidth: 1,
+    borderColor: DANGER,
+    backgroundColor: 'rgba(255, 59, 48, 0.08)',
+    borderRadius: 16,
+    padding: 14,
+    gap: 6,
+  },
+  hataBaslik: {
+    color: ALTIN,
+    fontSize: 14,
+    fontWeight: '500',
+    letterSpacing: 0.3,
+  },
+  hataMetin: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 13,
+    fontWeight: '300',
+    lineHeight: 18,
+  },
+  tekrarButonu: {
     flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 12,
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: 6,
+    backgroundColor: ALTIN,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  tekrarYazisi: {
+    color: SIYAH,
+    fontSize: 13,
+    fontWeight: '600',
+    letterSpacing: 0.3,
+  },
+  girdiAlani: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(255,215,0,0.18)',
     backgroundColor: SIYAH,
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  cevrimdisiSerit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 4,
+  },
+  cevrimdisiYazi: {
+    flex: 1,
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 11,
+    fontWeight: '300',
+    lineHeight: 15,
+  },
+  girdiSatiri: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 10,
   },
   girdi: {
     flex: 1,
@@ -314,6 +597,9 @@ const stiller = StyleSheet.create({
     paddingBottom: 12,
     color: ALTIN,
     fontSize: 14,
+  },
+  girdiPasif: {
+    opacity: 0.5,
   },
   gonderButonu: {
     width: 44,

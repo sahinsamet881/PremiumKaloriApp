@@ -19,9 +19,10 @@ type CalorieRingProps = {
 };
 
 export function CalorieRing({ size = 280, strokeWidth = 20 }: CalorieRingProps) {
-  const { kullanici } = useVeri();
-  const { gunlukHedefKalori, bugunAlinanKalori } = kullanici;
+  const { kullanici, saglikAktifKalori } = useVeri();
+  const { bugunAlinanKalori } = kullanici;
 
+  const gunlukHedefKalori = kullanici.gunlukHedefKalori + saglikAktifKalori;
   const kalanKalori = gunlukHedefKalori - bugunAlinanKalori;
   const oran = gunlukHedefKalori > 0 ? bugunAlinanKalori / gunlukHedefKalori : 0;
   const sinirliOran = Math.min(Math.max(oran, 0), 1);

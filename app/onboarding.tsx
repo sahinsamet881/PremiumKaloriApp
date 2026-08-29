@@ -753,7 +753,7 @@ export default function OnboardingScreen() {
         gunlukHedefKalori,
         makroHedefleri,
       });
-      router.replace('/auth');
+      router.replace('/paywall?akis=onboarding');
     }, 1800);
   };
 

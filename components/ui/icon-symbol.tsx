@@ -25,6 +25,7 @@ const MAPPING = {
   'star.fill': 'star',
   'magnifyingglass': 'search',
   'checkmark': 'check',
+  'barcode.viewfinder': 'qr-code-scanner',
 } as IconMapping;
 
 /**

@@ -61,3 +61,20 @@ export type Favori = {
 };
 
 export type SikKullanim = GecmisKaydi & { sayi: number };
+
+export type KiloKaydi = {
+  id: string;
+  tarih: string;
+  kilo: number;
+  not?: string;
+};
+
+export type YerelUrun = {
+  barkod: string;
+  isim: string;
+  kalori: number;
+  protein: number;
+  karbonhidrat: number;
+  yag: number;
+  porsiyon: string;
+};
