@@ -4,7 +4,16 @@ import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { setStatusBarStyle } from 'expo-status-bar';
 import { ReactNode, useCallback, useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -14,6 +23,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CalorieRing } from '@/components/calorie-ring';
 import { MealRow } from '@/components/meal-row';
+import { ScreenHeader, SCREEN_HEADER_ICERIK_YUKSEKLIGI } from '@/components/screen-header';
 import { ALTIN, ALTIN_ORTA_SOLUK, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
 
@@ -81,15 +91,18 @@ function MakroKutu({
   );
 }
 
-const OGUN_GRUPLARI = ['Kahvaltı', 'Öğle', 'Akşam'];
+const OGUN_GRUPLARI = ['Kahvaltı', 'Öğle', 'Ara Öğün', 'Akşam'];
 
 function ogunGrubunuBul(saat: string) {
   const dilim = parseInt(saat.split(':')[0], 10);
-  if (dilim >= 6 && dilim < 11) {
+  if (dilim >= 5 && dilim < 11) {
     return 'Kahvaltı';
   }
-  if (dilim >= 11 && dilim < 16) {
+  if (dilim >= 11 && dilim < 15) {
     return 'Öğle';
+  }
+  if (dilim >= 15 && dilim < 18) {
+    return 'Ara Öğün';
   }
   return 'Akşam';
 }
@@ -106,7 +119,7 @@ const SU_HEDEFI_ML = 2500;
 const SU_ARTIS_ML = 250;
 
 export default function TodayScreen() {
-  const { kullanici, ogunler, onboardingTamamlandi } = useVeri();
+  const { kullanici, ogunler, onboardingTamamlandi, girisYapildi, dunuKopyala } = useVeri();
   const [gununIpucu] = useState(
     () => GUNUN_IPUCLARI[Math.floor(Math.random() * GUNUN_IPUCLARI.length)]
   );
@@ -116,8 +129,12 @@ export default function TodayScreen() {
   useEffect(() => {
     if (onboardingTamamlandi === false) {
       router.replace('/onboarding');
+      return;
     }
-  }, [onboardingTamamlandi]);
+    if (onboardingTamamlandi && girisYapildi === false) {
+      router.replace('/auth');
+    }
+  }, [onboardingTamamlandi, girisYapildi]);
 
   useFocusEffect(
     useCallback(() => {
@@ -145,6 +162,17 @@ export default function TodayScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
+  const dunuKopyalaBas = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const sayi = dunuKopyala();
+    if (sayi === 0) {
+      Alert.alert('Dün Boş', 'Dün eklenmiş bir öğün bulunamadı.');
+      return;
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert('Kopyalandı', `Dünün ${sayi} öğünü bugüne eklendi.`);
+  };
+
   const alinanMakrolar = ogunler.reduce(
     (toplam, ogun) =>
       ogun.makrolar
@@ -162,14 +190,20 @@ export default function TodayScreen() {
     liste: ogunler.filter((ogun) => ogunGrubunuBul(ogun.eklenmeSaati) === grup),
   })).filter((bolum) => bolum.liste.length > 0);
 
-  if (!onboardingTamamlandi) {
+  if (!onboardingTamamlandi || !girisYapildi) {
     return <View style={styles.kok} />;
   }
 
   return (
     <View style={styles.kok}>
+      <ScreenHeader baslik="Bugün" />
       <SafeAreaView style={styles.kok}>
         <View style={styles.panel}>
+          <Pressable onPress={dunuKopyalaBas} style={styles.dunKopyalaButonu}>
+            <MaterialCommunityIcons name="content-copy" size={14} color={ALTIN} />
+            <Text style={styles.dunKopyalaYazisi}>Dünü Kopyala</Text>
+          </Pressable>
+
           <View style={[styles.kutu, styles.ogunlerKutusu]}>
             <View style={styles.ogunlerBaslikSatiri}>
               <View style={styles.tarihNavigator}>
@@ -261,9 +295,28 @@ const styles = StyleSheet.create({
   panel: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingTop: SCREEN_HEADER_ICERIK_YUKSEKLIGI + 4,
     paddingBottom: 10,
     gap: 14,
+  },
+  dunKopyalaButonu: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: ALTIN_SOLUK,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    marginTop: -4,
+  },
+  dunKopyalaYazisi: {
+    color: ALTIN,
+    fontSize: 12,
+    fontWeight: '400',
+    letterSpacing: 0.3,
   },
   kutu: {
     backgroundColor: SIYAH,

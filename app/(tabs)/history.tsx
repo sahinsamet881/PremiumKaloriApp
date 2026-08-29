@@ -1,7 +1,17 @@
 import { StatusBar } from 'expo-status-bar';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { Animated, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ALTIN, ALTIN_COK_SOLUK, ALTIN_ORTA_SOLUK, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
+import { ScreenHeader, SCREEN_HEADER_ICERIK_YUKSEKLIGI } from '@/components/screen-header';
+import {
+  ALTIN,
+  ALTIN_COK_SOLUK,
+  ALTIN_ORTA_SOLUK,
+  ALTIN_SOLUK,
+  SIYAH,
+  SURFACE,
+} from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
 
 const GUN_KISA_ADLARI = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
@@ -31,6 +41,8 @@ function ayGunleriniUret() {
 
 export default function HistoryScreen() {
   const { kullanici } = useVeri();
+  const insets = useSafeAreaInsets();
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const haftaninGunleri = haftaninGunleriniUret();
   const aktifGunSayisi = Math.min(Math.max(kullanici.seriGunu, 0), 7);
@@ -39,9 +51,17 @@ export default function HistoryScreen() {
   return (
     <View style={stiller.container}>
       <StatusBar style="light" />
-      <ScrollView contentContainerStyle={stiller.icerik} showsVerticalScrollIndicator={false}>
-        <Text style={stiller.baslik}>Geçmiş</Text>
-
+      <ScreenHeader baslik="Geçmiş" scrollY={scrollY} />
+      <Animated.ScrollView
+        contentContainerStyle={[
+          stiller.icerik,
+          { paddingTop: insets.top + SCREEN_HEADER_ICERIK_YUKSEKLIGI + 12 },
+        ]}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: false,
+        })}>
         <View style={stiller.serisKarti}>
           <View style={stiller.gunSirasi}>
             {haftaninGunleri.map((gun) => {
@@ -84,7 +104,7 @@ export default function HistoryScreen() {
             })}
           </View>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 }
@@ -96,20 +116,12 @@ const stiller = StyleSheet.create({
   },
   icerik: {
     paddingHorizontal: 24,
-    paddingTop: 80,
     paddingBottom: 60,
-  },
-  baslik: {
-    color: ALTIN,
-    fontFamily: 'StoriesGrand',
-    fontSize: 34,
-    letterSpacing: 1,
-    marginBottom: 28,
   },
   serisKarti: {
     borderWidth: 1,
     borderColor: ALTIN,
-    backgroundColor: 'rgba(10,11,16,0.6)',
+    backgroundColor: SURFACE,
     borderRadius: 20,
     padding: 20,
     marginBottom: 32,
@@ -162,7 +174,7 @@ const stiller = StyleSheet.create({
   takvimKarti: {
     borderWidth: 1,
     borderColor: ALTIN,
-    backgroundColor: 'rgba(10,11,16,0.6)',
+    backgroundColor: SURFACE,
     borderRadius: 20,
     padding: 16,
   },

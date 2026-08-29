@@ -4,12 +4,15 @@ export type MakroHedefleri = {
   yag: number;
 };
 
+export type Cinsiyet = 'kadin' | 'erkek';
+
 export type KullaniciVerisi = {
   isim: string;
   yas: number;
   boy: number;
   kilo: number;
   hedefKilo: number;
+  cinsiyet: Cinsiyet;
   gunlukHedefKalori: number;
   bugunAlinanKalori: number;
   seriGunu: number;
@@ -23,6 +26,7 @@ export type ProfilBilgisi = {
   boy: number;
   kilo: number;
   hedefKilo: number;
+  cinsiyet: Cinsiyet;
   gunlukHedefKalori: number;
   makroHedefleri: MakroHedefleri;
 };
@@ -41,3 +45,19 @@ export type Ogun = {
   eklenmeSaati: string;
   makrolar?: Makrolar;
 };
+
+export type GecmisKaydi = {
+  id: string;
+  isim: string;
+  kalori: number;
+  makrolar?: Makrolar;
+  zaman: number;
+};
+
+export type Favori = {
+  isim: string;
+  kalori: number;
+  makrolar?: Makrolar;
+};
+
+export type SikKullanim = GecmisKaydi & { sayi: number };

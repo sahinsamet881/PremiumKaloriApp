@@ -6,12 +6,9 @@ import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-na
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ALTIN, ALTIN_ORTA_SOLUK, ALTIN_PLACEHOLDER, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
-import { useVeri } from '@/context/DataContext';
 import { YerelBesin, YEREL_BESIN_VERITABANI } from '@/data/foodDatabase';
 
 export default function SearchScreen() {
-  const { hizliKaloriEkle } = useVeri();
-
   const [sorgu, setSorgu] = useState('');
 
   const sonuclar = useMemo(() => {
@@ -27,13 +24,7 @@ export default function SearchScreen() {
   }, [sorgu]);
 
   const besinSecildi = (besin: YerelBesin) => {
-    hizliKaloriEkle(besin.kalori, besin.isim, {
-      protein: besin.protein,
-      karbonhidrat: besin.karbonhidrat,
-      yag: besin.yag,
-      porsiyon: besin.porsiyon,
-    });
-    router.push('/');
+    router.push({ pathname: '/ogun-duzenle', params: { besinId: besin.id } });
   };
 
   return (

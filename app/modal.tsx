@@ -1,22 +1,13 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useRef, useState } from 'react';
-import {
-  Animated,
-  Keyboard,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableWithoutFeedback,
-  View,
-} from 'react-native';
+import { useRef } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { ALTIN, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
+import { ALTIN, ALTIN_COK_SOLUK, ALTIN_ORTA_SOLUK, SIYAH, SURFACE } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
+import { Makrolar } from '@/types';
 
 type IkonAdi = 'bolt.fill' | 'star.fill' | 'magnifyingglass';
 
@@ -46,12 +37,10 @@ function LuksSecenekKarti({ ikon, baslik, aciklama, onPress }: LuksSecenekKartiP
     <Pressable onPress={onPress} onPressIn={basildi} onPressOut={birakildi}>
       <Animated.View style={[stiller.kart, { backgroundColor: arkaPlanRengi }]}>
         <Animated.View style={{ opacity: ikonSaydamlik }}>
-          <IconSymbol name={ikon} size={26} color={ALTIN} />
+          <IconSymbol name={ikon} size={24} color={ALTIN} />
         </Animated.View>
         <View style={stiller.kartMetin}>
-          <Animated.Text style={[stiller.kartBaslik, { color: metinRengi }]}>
-            {baslik}
-          </Animated.Text>
+          <Animated.Text style={[stiller.kartBaslik, { color: metinRengi }]}>{baslik}</Animated.Text>
           <Animated.Text style={[stiller.kartAciklama, { color: metinRengi, opacity: 0.7 }]}>
             {aciklama}
           </Animated.Text>
@@ -61,122 +50,91 @@ function LuksSecenekKarti({ ikon, baslik, aciklama, onPress }: LuksSecenekKartiP
   );
 }
 
+type HizliCipProps = {
+  isim: string;
+  kalori: number;
+  onPress: () => void;
+};
+
+function HizliCip({ isim, kalori, onPress }: HizliCipProps) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [stiller.cip, pressed ? stiller.cipBasili : null]}>
+      <MaterialCommunityIcons name="plus" size={13} color={ALTIN} />
+      <Text style={stiller.cipIsim} numberOfLines={1}>
+        {isim}
+      </Text>
+      <Text style={stiller.cipKalori}>{kalori} kcal</Text>
+    </Pressable>
+  );
+}
+
 export default function ModalScreen() {
-  const { hizliKaloriEkle } = useVeri();
-  const [gorunum, setGorunum] = useState<'liste' | 'hizliKalori'>('liste');
-  const [isimMetni, setIsimMetni] = useState('');
-  const [kaloriMetni, setKaloriMetni] = useState('');
-  const kaloriGirisiRef = useRef<TextInput>(null);
-  const ekleDoluluk = useRef(new Animated.Value(0)).current;
+  const { sikKullanilanlar, favoriler, hizliKaloriEkle } = useVeri();
 
-  const kaloriSayisi = Number(kaloriMetni);
-  const gecerliMi = kaloriMetni.length > 0 && kaloriSayisi > 0;
-
-  const kaloriEkle = () => {
-    if (!gecerliMi) {
-      return;
-    }
-    hizliKaloriEkle(kaloriSayisi, isimMetni);
-    router.back();
+  const hizliEkle = (isim: string, kalori: number, makrolar?: Makrolar) => {
+    hizliKaloriEkle(kalori, isim, makrolar);
+    router.dismissAll();
   };
-
-  const ekleBasildi = () => {
-    if (!gecerliMi) {
-      return;
-    }
-    Animated.timing(ekleDoluluk, { toValue: 1, duration: 200, useNativeDriver: false }).start();
-  };
-
-  const ekleBirakildi = () => {
-    Animated.timing(ekleDoluluk, { toValue: 0, duration: 280, useNativeDriver: false }).start();
-  };
-
-  const ekleArkaPlani = ekleDoluluk.interpolate({ inputRange: [0, 1], outputRange: [SIYAH, ALTIN] });
-  const ekleMetinRengi = ekleDoluluk.interpolate({ inputRange: [0, 1], outputRange: [ALTIN, SIYAH] });
-
-  if (gorunum === 'hizliKalori') {
-    return (
-      <KeyboardAvoidingView
-        style={stiller.container}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View style={stiller.container}>
-            <StatusBar style="light" />
-            <Pressable onPress={() => setGorunum('liste')} style={stiller.geriButonu}>
-              <IconSymbol name="chevron.left" size={16} color={ALTIN} />
-              <Text style={stiller.geriMetni}>Geri</Text>
-            </Pressable>
-
-            <View style={stiller.girisAlani}>
-              <TextInput
-                autoFocus
-                value={isimMetni}
-                onChangeText={setIsimMetni}
-                keyboardType="default"
-                returnKeyType="next"
-                onSubmitEditing={() => kaloriGirisiRef.current?.focus()}
-                blurOnSubmit={false}
-                placeholder="Örn: Yulaf Ezmesi"
-                placeholderTextColor={ALTIN_SOLUK}
-                selectionColor={ALTIN}
-                style={stiller.isimGirisi}
-              />
-              <TextInput
-                ref={kaloriGirisiRef}
-                value={kaloriMetni}
-                onChangeText={(metin) => setKaloriMetni(metin.replace(/[^0-9]/g, ''))}
-                keyboardType="number-pad"
-                returnKeyType="done"
-                onSubmitEditing={kaloriEkle}
-                placeholder="0"
-                placeholderTextColor={ALTIN_SOLUK}
-                selectionColor={ALTIN}
-                style={stiller.kaloriGirisi}
-              />
-              <Text style={stiller.kaloriEtiketi}>kcal</Text>
-            </View>
-
-            <Pressable onPress={kaloriEkle} onPressIn={ekleBasildi} onPressOut={ekleBirakildi}>
-              <Animated.View
-                style={[
-                  stiller.ekleButonu,
-                  { backgroundColor: ekleArkaPlani, opacity: gecerliMi ? 1 : 0.35 },
-                ]}>
-                <Animated.Text style={[stiller.ekleButonuMetni, { color: ekleMetinRengi }]}>
-                  Ekle
-                </Animated.Text>
-              </Animated.View>
-            </Pressable>
-          </View>
-        </TouchableWithoutFeedback>
-      </KeyboardAvoidingView>
-    );
-  }
 
   return (
     <View style={stiller.container}>
       <StatusBar style="light" />
-      <Text style={stiller.baslik}>Ekle</Text>
-      <View style={stiller.liste}>
-        <LuksSecenekKarti
-          ikon="bolt.fill"
-          baslik="Hızlı Kalori"
-          aciklama="Sadece bir sayı gir, geç"
-          onPress={() => setGorunum('hizliKalori')}
-        />
-        <LuksSecenekKarti
-          ikon="star.fill"
-          baslik="Hazır Butonlar"
-          aciklama="Sık kullandığın besinlerden seç"
-          onPress={() => router.back()}
-        />
-        <LuksSecenekKarti
-          ikon="magnifyingglass"
-          baslik="Yemek Ara"
-          aciklama="İsimle ara ve ekle"
-          onPress={() => router.push('/search')}
-        />
-      </View>
+      <View style={stiller.tutamac} />
+      <ScrollView
+        contentContainerStyle={stiller.icerik}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled">
+        <Text style={stiller.baslik}>Öğün Ekle</Text>
+
+        <View style={stiller.liste}>
+          <LuksSecenekKarti
+            ikon="bolt.fill"
+            baslik="Elle Ekle"
+            aciklama="İsim, porsiyon ve kalori gir"
+            onPress={() => router.push('/ogun-duzenle')}
+          />
+          <LuksSecenekKarti
+            ikon="magnifyingglass"
+            baslik="Yemek Ara"
+            aciklama="Veritabanından seç, porsiyonu ayarla"
+            onPress={() => router.push('/search')}
+          />
+        </View>
+
+        {sikKullanilanlar.length > 0 ? (
+          <View style={stiller.bolum}>
+            <Text style={stiller.bolumBasligi}>Son Eklenenler</Text>
+            <View style={stiller.cipListesi}>
+              {sikKullanilanlar.slice(0, 8).map((kayit) => (
+                <HizliCip
+                  key={kayit.id}
+                  isim={kayit.isim}
+                  kalori={kayit.kalori}
+                  onPress={() => hizliEkle(kayit.isim, kayit.kalori, kayit.makrolar)}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+
+        {favoriler.length > 0 ? (
+          <View style={stiller.bolum}>
+            <Text style={stiller.bolumBasligi}>Favoriler</Text>
+            <View style={stiller.cipListesi}>
+              {favoriler.map((favori) => (
+                <HizliCip
+                  key={favori.isim}
+                  isim={favori.isim}
+                  kalori={favori.kalori}
+                  onPress={() => hizliEkle(favori.isim, favori.kalori, favori.makrolar)}
+                />
+              ))}
+            </View>
+          </View>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
@@ -185,15 +143,26 @@ const stiller = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: SIYAH,
-    padding: 24,
+  },
+  tutamac: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: ALTIN_COK_SOLUK,
+    marginTop: 10,
+    marginBottom: 12,
+  },
+  icerik: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+    gap: 22,
   },
   baslik: {
     color: ALTIN,
-    fontSize: 28,
-    fontWeight: '300',
-    letterSpacing: 1.5,
-    marginTop: 12,
-    marginBottom: 28,
+    fontFamily: 'StoriesGrand',
+    fontSize: 24,
+    letterSpacing: 0.5,
   },
   liste: {
     gap: 12,
@@ -221,57 +190,43 @@ const stiller = StyleSheet.create({
     marginTop: 3,
     letterSpacing: 0.3,
   },
-  geriButonu: {
+  bolum: {
+    gap: 12,
+  },
+  bolumBasligi: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 12,
+    fontWeight: '300',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  cipListesi: {
+    gap: 8,
+  },
+  cip: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 2,
-    alignSelf: 'flex-start',
-  },
-  geriMetni: {
-    color: ALTIN,
-    fontSize: 17,
-    fontWeight: '300',
-  },
-  girisAlani: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  isimGirisi: {
-    color: ALTIN,
-    fontSize: 20,
-    fontWeight: '300',
-    letterSpacing: 0.8,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  kaloriGirisi: {
-    color: ALTIN,
-    fontSize: 96,
-    fontWeight: '300',
-    letterSpacing: -1,
-    textAlign: 'center',
-    minWidth: 160,
-  },
-  kaloriEtiketi: {
-    color: ALTIN_SOLUK,
-    fontSize: 17,
-    fontWeight: '300',
-    marginTop: 4,
-    letterSpacing: 1,
-  },
-  ekleButonu: {
-    height: 56,
-    borderRadius: 28,
+    gap: 10,
     borderWidth: 1,
-    borderColor: ALTIN,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
+    borderColor: ALTIN_COK_SOLUK,
+    backgroundColor: SURFACE,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
   },
-  ekleButonuMetni: {
-    fontSize: 17,
+  cipBasili: {
+    opacity: 0.6,
+  },
+  cipIsim: {
+    flex: 1,
+    color: ALTIN,
+    fontSize: 14,
+    fontWeight: '300',
+    letterSpacing: 0.3,
+  },
+  cipKalori: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 13,
     fontWeight: '400',
-    letterSpacing: 1,
   },
 });

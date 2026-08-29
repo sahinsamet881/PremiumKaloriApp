@@ -8,6 +8,7 @@ import {
   Easing,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Platform,
@@ -21,8 +22,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ALTIN, ALTIN_COK_SOLUK, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
+import {
+  ALTIN,
+  ALTIN_COK_SOLUK,
+  ALTIN_ORTA_SOLUK,
+  ALTIN_SOLUK,
+  SIYAH,
+  SURFACE,
+} from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
+import { BMR_FORMUL_ADI, bmrHesapla } from '@/nutrition/kalori';
 import { MakroHedefleri } from '@/types';
 
 type TemelHedef = 'ver' | 'al' | 'koru';
@@ -37,7 +46,7 @@ type OnboardingCevaplari = {
   isim: string;
   temelHedef: TemelHedef | null;
   cinsiyet: Cinsiyet | null;
-  yas: string;
+  dogumYili: string;
   boy: string;
   kilo: string;
   hedefKilo: string;
@@ -52,7 +61,7 @@ const BOS_CEVAPLAR: OnboardingCevaplari = {
   isim: '',
   temelHedef: null,
   cinsiyet: null,
-  yas: '',
+  dogumYili: '',
   boy: '',
   kilo: '',
   hedefKilo: '',
@@ -81,7 +90,7 @@ const ANIMASYON_TIPLERI: AnimasyonTipi[] = [
 const ADIM_BASLIKLARI = [
   'Sana ne diyelim?',
   'Bugünkü hedefin ne?',
-  'Yaşını ve cinsiyetini öğrenelim',
+  'Doğum yılını ve cinsiyetini öğrenelim',
   'Mezura ve tartı zamanı!',
   'Nereye varmak istiyorsun?',
   'Günün ne kadar hareketli?',
@@ -235,15 +244,20 @@ const MOTIVASYON_GERI_BILDIRIM: Record<string, string> = {
   performans: 'Sınırlarını zorlamaya hazır ol.',
 };
 
-function bmrHesapla(cinsiyet: Cinsiyet, kiloKg: number, boyCm: number, yas: number) {
-  if (cinsiyet === 'erkek') {
-    return 88.362 + 13.397 * kiloKg + 4.799 * boyCm - 5.677 * yas;
+const GUNCEL_YIL = new Date().getFullYear();
+const MIN_DOGUM_YILI = 1900;
+const YAS_ALT_SINIRI = 18;
+
+function yasHesapla(dogumYili: string): number {
+  const yil = Number(dogumYili);
+  if (!yil || yil < MIN_DOGUM_YILI || yil > GUNCEL_YIL) {
+    return 0;
   }
-  return 447.593 + 9.247 * kiloKg + 3.098 * boyCm - 4.33 * yas;
+  return GUNCEL_YIL - yil;
 }
 
 function hedefleriHesapla(cevaplar: OnboardingCevaplari) {
-  const yas = Number(cevaplar.yas) || 30;
+  const yas = yasHesapla(cevaplar.dogumYili) || 30;
   const boy = Number(cevaplar.boy) || 170;
   const kilo = Number(cevaplar.kilo) || 70;
   const cinsiyet = cevaplar.cinsiyet ?? 'kadin';
@@ -253,8 +267,11 @@ function hedefleriHesapla(cevaplar: OnboardingCevaplari) {
   const beslenme = cevaplar.beslenmeTercihi ?? 'dengeli';
 
   const bazalMetabolizma = bmrHesapla(cinsiyet, kilo, boy, yas);
-  const gunlukHarcama = bazalMetabolizma * AKTIVITE_CARPANLARI[aktivite] * UYKU_CARPANLARI[uyku];
-  const hedefKaloriHam = gunlukHarcama + HEDEF_KALORI_AYARI[hedef];
+  const aktiviteCarpani = AKTIVITE_CARPANLARI[aktivite];
+  const uykuCarpani = UYKU_CARPANLARI[uyku];
+  const gunlukHarcama = bazalMetabolizma * aktiviteCarpani * uykuCarpani;
+  const hedefAyari = HEDEF_KALORI_AYARI[hedef];
+  const hedefKaloriHam = gunlukHarcama + hedefAyari;
   const gunlukHedefKalori = Math.max(1200, Math.round(hedefKaloriHam));
 
   const yuzdeler = MAKRO_YUZDELERI[beslenme];
@@ -264,7 +281,21 @@ function hedefleriHesapla(cevaplar: OnboardingCevaplari) {
     yag: Math.round((gunlukHedefKalori * yuzdeler.yag) / 9),
   };
 
-  return { gunlukHedefKalori, makroHedefleri };
+  return {
+    gunlukHedefKalori,
+    makroHedefleri,
+    detay: {
+      yas,
+      boy,
+      kilo,
+      cinsiyet,
+      bmr: Math.round(bazalMetabolizma),
+      aktiviteCarpani,
+      uykuCarpani,
+      tdee: Math.round(gunlukHarcama),
+      hedefAyari,
+    },
+  };
 }
 
 function geriBildirimUret(adim: number, cevaplar: OnboardingCevaplari) {
@@ -276,7 +307,9 @@ function geriBildirimUret(adim: number, cevaplar: OnboardingCevaplari) {
     case 1:
       return cevaplar.temelHedef ? TEMEL_HEDEF_GERI_BILDIRIM[cevaplar.temelHedef] : '';
     case 2:
-      return cevaplar.cinsiyet && cevaplar.yas ? CINSIYET_GERI_BILDIRIM[cevaplar.cinsiyet] : '';
+      return cevaplar.cinsiyet && cevaplar.dogumYili
+        ? CINSIYET_GERI_BILDIRIM[cevaplar.cinsiyet]
+        : '';
     case 3:
       return cevaplar.boy && cevaplar.kilo
         ? 'Bu bilgiler, seni en iyi şekilde tanımamızı sağlıyor.'
@@ -448,6 +481,125 @@ function DikeySecici({
   );
 }
 
+function SeffaflikSatiri({
+  etiket,
+  deger,
+  vurgu,
+}: {
+  etiket: string;
+  deger: string;
+  vurgu?: boolean;
+}) {
+  return (
+    <View style={stiller.seffaflikSatiri}>
+      <Text style={[stiller.seffaflikEtiket, vurgu ? stiller.seffaflikVurguYazi : null]}>
+        {etiket}
+      </Text>
+      <Text style={[stiller.seffaflikDeger, vurgu ? stiller.seffaflikVurguYazi : null]}>{deger}</Text>
+    </View>
+  );
+}
+
+type SeffaflikEkraniProps = {
+  cevaplar: OnboardingCevaplari;
+  onGeri: () => void;
+  onOnayla: () => void;
+};
+
+function SeffaflikEkrani({ cevaplar, onGeri, onOnayla }: SeffaflikEkraniProps) {
+  const { gunlukHedefKalori, detay } = hedefleriHesapla(cevaplar);
+  const aktiviteEtiket =
+    AKTIVITE_SECENEKLERI.find((secenek) => secenek.id === cevaplar.aktiviteDuzeyi)?.etiket ?? '—';
+  const hedefEtiket =
+    TEMEL_HEDEF_SECENEKLERI.find((secenek) => secenek.id === cevaplar.temelHedef)?.etiket ?? '—';
+  const cinsiyetEtiket = cevaplar.cinsiyet === 'erkek' ? 'Erkek' : 'Kadın';
+  const ayarMetni = `${detay.hedefAyari >= 0 ? '+' : ''}${detay.hedefAyari} kcal`;
+
+  return (
+    <View style={stiller.kok}>
+      <StatusBar style="light" />
+      <SafeAreaView style={stiller.kok}>
+        <ScrollView
+          contentContainerStyle={stiller.seffaflikIcerik}
+          showsVerticalScrollIndicator={false}>
+          <MaterialCommunityIcons name="calculator-variant-outline" size={46} color={ALTIN} />
+          <Text style={stiller.seffaflikBaslik}>Hesabın Nasıl Çıktı?</Text>
+          <Text style={stiller.seffaflikAltBaslik}>
+            Günlük kalori hedefin {BMR_FORMUL_ADI} formülüyle, girdiğin değerler üzerinden hesaplandı.
+          </Text>
+
+          <View style={stiller.seffaflikKarti}>
+            <Text style={stiller.seffaflikKartBaslik}>Girdiğin Değerler</Text>
+            <SeffaflikSatiri etiket="Cinsiyet" deger={cinsiyetEtiket} />
+            <SeffaflikSatiri etiket="Yaş" deger={`${detay.yas} (${cevaplar.dogumYili} doğumlu)`} />
+            <SeffaflikSatiri etiket="Boy" deger={`${detay.boy} cm`} />
+            <SeffaflikSatiri etiket="Kilo" deger={`${detay.kilo} kg`} />
+            <SeffaflikSatiri etiket="Aktivite" deger={aktiviteEtiket} />
+            <SeffaflikSatiri etiket="Hedef" deger={hedefEtiket} />
+          </View>
+
+          <View style={stiller.seffaflikKarti}>
+            <Text style={stiller.seffaflikKartBaslik}>Adım Adım Hesap</Text>
+            <SeffaflikSatiri
+              etiket={`Bazal metabolizma (${BMR_FORMUL_ADI})`}
+              deger={`${detay.bmr} kcal`}
+            />
+            <SeffaflikSatiri
+              etiket="Aktivite × uyku çarpanı"
+              deger={`${detay.aktiviteCarpani} × ${detay.uykuCarpani}`}
+            />
+            <SeffaflikSatiri etiket="Günlük harcama (TDEE)" deger={`${detay.tdee} kcal`} />
+            <SeffaflikSatiri etiket="Hedef ayarı" deger={ayarMetni} />
+            <View style={stiller.seffaflikAyrac} />
+            <SeffaflikSatiri
+              etiket="Günlük hedef kalori"
+              deger={`${gunlukHedefKalori} kcal`}
+              vurgu
+            />
+          </View>
+
+          <Pressable onPress={onOnayla} style={stiller.onaylaButonu}>
+            <Text style={stiller.onaylaButonuYazisi}>Onaylıyorum, Başlayalım</Text>
+          </Pressable>
+          <Pressable onPress={onGeri} hitSlop={10} style={stiller.duzenleButonu}>
+            <Text style={stiller.duzenleButonuYazisi}>Değerleri düzenle</Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
+  );
+}
+
+function YasEngeliEkrani({ onDuzelt }: { onDuzelt: () => void }) {
+  return (
+    <View style={[stiller.kok, stiller.engelKok]}>
+      <StatusBar style="light" />
+      <MaterialCommunityIcons name="shield-alert-outline" size={62} color={ALTIN} />
+      <Text style={stiller.engelBaslik}>Bu Uygulama 18 Yaş ve{'\n'}Üzeri İçindir</Text>
+      <Text style={stiller.engelMetin}>
+        Kalori takibi ve diyet içerikleri yetişkinlere yöneliktir. Gelişim çağında kısıtlayıcı
+        beslenme sağlığa zarar verebileceğinden girişine şu an izin veremiyoruz.
+      </Text>
+
+      <View style={stiller.destekKarti}>
+        <Text style={stiller.destekBaslik}>Yalnız değilsin</Text>
+        <Text style={stiller.destekMetin}>
+          Beslenme, kilo veya vücut algınla ilgili zorlanıyorsan bir doktora, diyetisyene ya da okul
+          rehberlik servisine danışabilirsin.
+        </Text>
+        <Pressable onPress={() => Linking.openURL('tel:182')} style={stiller.destekHat}>
+          <MaterialCommunityIcons name="phone-outline" size={16} color={ALTIN} />
+          <Text style={stiller.destekHatYazisi}>Sağlık Bakanlığı Danışma Hattı: 182</Text>
+        </Pressable>
+      </View>
+
+      <Pressable onPress={onDuzelt} hitSlop={10}>
+        <Text style={stiller.duzeltYazisi}>Doğum yılını yanlış mı girdim? Geri dön</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export default function OnboardingScreen() {
   const { profilKaydet } = useVeri();
 
@@ -455,6 +607,8 @@ export default function OnboardingScreen() {
   const [cevaplar, setCevaplar] = useState<OnboardingCevaplari>(BOS_CEVAPLAR);
   const [hesaplaniyor, setHesaplaniyor] = useState(false);
   const [geciyor, setGeciyor] = useState<TemelHedef | null>(null);
+  const [yasEngeli, setYasEngeli] = useState(false);
+  const [sonuclariGoster, setSonuclariGoster] = useState(false);
 
   const cevirX = useRef(new Animated.Value(0)).current;
   const cevirY = useRef(new Animated.Value(0)).current;
@@ -561,7 +715,11 @@ export default function OnboardingScreen() {
       case 1:
         return cevaplar.temelHedef !== null;
       case 2:
-        return cevaplar.cinsiyet !== null && cevaplar.yas.trim().length > 0;
+        return (
+          cevaplar.cinsiyet !== null &&
+          cevaplar.dogumYili.trim().length === 4 &&
+          yasHesapla(cevaplar.dogumYili) > 0
+        );
       case 3:
         return cevaplar.boy.trim().length > 0 && cevaplar.kilo.trim().length > 0;
       case 4:
@@ -587,14 +745,15 @@ export default function OnboardingScreen() {
       const { gunlukHedefKalori, makroHedefleri } = hedefleriHesapla(cevaplar);
       profilKaydet({
         isim: cevaplar.isim.trim(),
-        yas: Number(cevaplar.yas) || 0,
+        yas: yasHesapla(cevaplar.dogumYili),
         boy: Number(cevaplar.boy) || 0,
         kilo: Number(cevaplar.kilo) || 0,
         hedefKilo: Number(cevaplar.hedefKilo) || 0,
+        cinsiyet: cevaplar.cinsiyet ?? 'kadin',
         gunlukHedefKalori,
         makroHedefleri,
       });
-      router.replace('/(tabs)');
+      router.replace('/auth');
     }, 1800);
   };
 
@@ -602,8 +761,12 @@ export default function OnboardingScreen() {
     if (!adimGecerliMi) {
       return;
     }
+    if (adim === 2 && yasHesapla(cevaplar.dogumYili) < YAS_ALT_SINIRI) {
+      setYasEngeli(true);
+      return;
+    }
     if (adim === TOPLAM_ADIM - 1) {
-      analiziBaslat();
+      setSonuclariGoster(true);
       return;
     }
     setAdim((onceki) => onceki + 1);
@@ -631,9 +794,30 @@ export default function OnboardingScreen() {
         <ActivityIndicator size="large" color={ALTIN} />
         <Text style={stiller.yuklemeBasligi}>Hedeflerin Analiz Ediliyor...</Text>
         <Text style={stiller.yuklemeAltYazi}>
-          Harris-Benedict formülüyle sana özel hesaplanıyor
+          {BMR_FORMUL_ADI} formülüyle sana özel hesaplanıyor
         </Text>
       </View>
+    );
+  }
+
+  if (yasEngeli) {
+    return (
+      <YasEngeliEkrani
+        onDuzelt={() => {
+          setYasEngeli(false);
+          setAdim(2);
+        }}
+      />
+    );
+  }
+
+  if (sonuclariGoster) {
+    return (
+      <SeffaflikEkrani
+        cevaplar={cevaplar}
+        onGeri={() => setSonuclariGoster(false)}
+        onOnayla={analiziBaslat}
+      />
     );
   }
 
@@ -733,10 +917,13 @@ export default function OnboardingScreen() {
                         ))}
                       </View>
                       <TextInput
-                        value={cevaplar.yas}
-                        onChangeText={(metin) => cevapGuncelle('yas', metin.replace(/[^0-9]/g, ''))}
+                        value={cevaplar.dogumYili}
+                        onChangeText={(metin) =>
+                          cevapGuncelle('dogumYili', metin.replace(/[^0-9]/g, '').slice(0, 4))
+                        }
                         keyboardType="number-pad"
-                        placeholder="Yaşın"
+                        maxLength={4}
+                        placeholder="Doğum yılın (örn. 2000)"
                         placeholderTextColor={ALTIN_SOLUK}
                         selectionColor={ALTIN}
                         style={[stiller.metinGirisi, stiller.ikinciGiris]}
@@ -898,7 +1085,7 @@ const stiller = StyleSheet.create({
     minWidth: 56,
   },
   geriYazisi: {
-    color: 'rgba(232,195,124,0.7)',
+    color: ALTIN_ORTA_SOLUK,
     fontSize: 15,
     fontWeight: '300',
   },
@@ -915,7 +1102,7 @@ const stiller = StyleSheet.create({
     backgroundColor: ALTIN,
   },
   adimSayaci: {
-    color: 'rgba(232,195,124,0.55)',
+    color: ALTIN_ORTA_SOLUK,
     fontSize: 13,
     fontWeight: '300',
     minWidth: 36,
@@ -997,7 +1184,7 @@ const stiller = StyleSheet.create({
     alignItems: 'center',
   },
   dikeySeciciEtiket: {
-    color: 'rgba(232,195,124,0.55)',
+    color: ALTIN_ORTA_SOLUK,
     fontSize: 13,
     fontWeight: '300',
     textTransform: 'uppercase',
@@ -1057,7 +1244,7 @@ const stiller = StyleSheet.create({
     fontWeight: '400',
   },
   zekiMetin: {
-    color: 'rgba(232,195,124,0.5)',
+    color: ALTIN_ORTA_SOLUK,
     fontSize: 12,
     fontWeight: '300',
     fontStyle: 'italic',
@@ -1116,7 +1303,7 @@ const stiller = StyleSheet.create({
     textAlign: 'center',
   },
   yuklemeAltYazi: {
-    color: 'rgba(232,195,124,0.55)',
+    color: ALTIN_ORTA_SOLUK,
     fontSize: 14,
     fontWeight: '300',
     textAlign: 'center',
@@ -1134,5 +1321,168 @@ const stiller = StyleSheet.create({
     fontSize: 22,
     letterSpacing: 0.5,
     textAlign: 'center',
+  },
+  engelKok: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 32,
+    gap: 18,
+  },
+  engelBaslik: {
+    color: ALTIN,
+    fontFamily: 'StoriesGrand',
+    fontSize: 26,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    lineHeight: 34,
+  },
+  engelMetin: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 14,
+    fontWeight: '300',
+    lineHeight: 21,
+    textAlign: 'center',
+  },
+  destekKarti: {
+    alignSelf: 'stretch',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.4)',
+    backgroundColor: 'rgba(232,195,124,0.05)',
+    borderRadius: 18,
+    padding: 18,
+    marginTop: 6,
+    gap: 10,
+  },
+  destekBaslik: {
+    color: ALTIN,
+    fontSize: 13,
+    fontWeight: '400',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  destekMetin: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 13,
+    fontWeight: '300',
+    lineHeight: 19,
+  },
+  destekHat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  destekHatYazisi: {
+    color: ALTIN,
+    fontSize: 13,
+    fontWeight: '400',
+    letterSpacing: 0.2,
+  },
+  duzeltYazisi: {
+    color: ALTIN_SOLUK,
+    fontSize: 13,
+    fontWeight: '300',
+    textDecorationLine: 'underline',
+    marginTop: 8,
+  },
+  seffaflikIcerik: {
+    flexGrow: 1,
+    alignItems: 'center',
+    paddingHorizontal: 28,
+    paddingTop: 40,
+    paddingBottom: 32,
+    gap: 14,
+  },
+  seffaflikBaslik: {
+    color: ALTIN,
+    fontFamily: 'StoriesGrand',
+    fontSize: 28,
+    letterSpacing: 0.5,
+    textAlign: 'center',
+  },
+  seffaflikAltBaslik: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 13,
+    fontWeight: '300',
+    lineHeight: 19,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  seffaflikKarti: {
+    alignSelf: 'stretch',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.4)',
+    backgroundColor: SURFACE,
+    borderRadius: 18,
+    padding: 18,
+  },
+  seffaflikKartBaslik: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 12,
+    fontWeight: '300',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+    marginBottom: 12,
+  },
+  seffaflikSatiri: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingVertical: 7,
+  },
+  seffaflikEtiket: {
+    flex: 1,
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 13,
+    fontWeight: '300',
+    letterSpacing: 0.2,
+  },
+  seffaflikDeger: {
+    color: ALTIN,
+    fontSize: 14,
+    fontWeight: '400',
+    letterSpacing: 0.2,
+    textAlign: 'right',
+  },
+  seffaflikVurguYazi: {
+    color: ALTIN,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  seffaflikAyrac: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: ALTIN_COK_SOLUK,
+    marginVertical: 8,
+  },
+  onaylaButonu: {
+    alignSelf: 'stretch',
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: ALTIN,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  onaylaButonuYazisi: {
+    color: SIYAH,
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+  },
+  duzenleButonu: {
+    alignItems: 'center',
+    paddingVertical: 6,
+  },
+  duzenleButonuYazisi: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 13,
+    fontWeight: '300',
+    letterSpacing: 0.3,
   },
 });

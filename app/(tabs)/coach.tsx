@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader, SCREEN_HEADER_ICERIK_YUKSEKLIGI } from '@/components/screen-header';
 import { GEMINI_API_KEY, KOC_MODELI } from '@/constants/ai';
 import { ALTIN, ALTIN_ORTA_SOLUK, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
@@ -133,22 +134,16 @@ export default function CoachScreen() {
   return (
     <View style={stiller.kok}>
       <StatusBar style="light" />
-      <SafeAreaView style={stiller.kok} edges={['top']}>
-        <View style={stiller.baslikSatiri}>
-          <View style={stiller.baslikSol}>
-            <View style={stiller.avatar}>
-              <MaterialCommunityIcons name="robot-happy-outline" size={22} color={ALTIN} />
-            </View>
-            <View>
-              <Text style={stiller.baslik}>AI Koç</Text>
-              <Text style={stiller.altBaslik}>{yaziliyor ? 'yazıyor...' : 'çevrimiçi'}</Text>
-            </View>
-          </View>
+      <ScreenHeader
+        baslik="AI Koç"
+        altBaslik={yaziliyor ? 'yazıyor...' : 'çevrimiçi'}
+        sag={
           <View style={stiller.betaRozeti}>
             <Text style={stiller.betaYazisi}>BETA</Text>
           </View>
-        </View>
-
+        }
+      />
+      <SafeAreaView style={stiller.kok} edges={['top']}>
         <KeyboardAvoidingView
           style={stiller.kok}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -156,7 +151,10 @@ export default function CoachScreen() {
           <ScrollView
             ref={kaydiriciRef}
             style={stiller.sohbet}
-            contentContainerStyle={stiller.sohbetIcerik}
+            contentContainerStyle={[
+              stiller.sohbetIcerik,
+              { paddingTop: SCREEN_HEADER_ICERIK_YUKSEKLIGI + 12 },
+            ]}
             onContentSizeChange={() => kaydiriciRef.current?.scrollToEnd({ animated: true })}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled">
@@ -222,43 +220,6 @@ const stiller = StyleSheet.create({
   kok: {
     flex: 1,
     backgroundColor: SIYAH,
-  },
-  baslikSatiri: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,215,0,0.18)',
-  },
-  baslikSol: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  avatar: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
-    borderColor: 'rgba(255,215,0,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(232,195,124,0.06)',
-  },
-  baslik: {
-    color: ALTIN,
-    fontFamily: 'StoriesGrand',
-    fontSize: 20,
-    letterSpacing: 0.5,
-  },
-  altBaslik: {
-    color: ALTIN_ORTA_SOLUK,
-    fontSize: 11,
-    fontWeight: '300',
-    letterSpacing: 0.3,
-    marginTop: 2,
   },
   betaRozeti: {
     paddingHorizontal: 10,

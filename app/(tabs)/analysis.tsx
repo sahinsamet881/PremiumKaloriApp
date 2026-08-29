@@ -2,10 +2,20 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRef } from 'react';
+import { Alert, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
-import { ALTIN, ALTIN_COK_SOLUK, ALTIN_ORTA_SOLUK, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
+import { ScreenHeader, SCREEN_HEADER_ICERIK_YUKSEKLIGI } from '@/components/screen-header';
+import {
+  ALTIN,
+  ALTIN_COK_SOLUK,
+  ALTIN_ORTA_SOLUK,
+  ALTIN_SOLUK,
+  SIYAH,
+  SURFACE,
+} from '@/constants/luxTheme';
 import { PREMIUM_AKTIF } from '@/constants/premium';
 import { useVeri } from '@/context/DataContext';
 
@@ -30,6 +40,8 @@ function MakroSatiri({ etiket, yuzde }: MakroSatiriProps) {
 
 export default function AnalysisScreen() {
   const { kullanici, profilSifirla } = useVeri();
+  const insets = useSafeAreaInsets();
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const profiliSifirlaSor = () => {
     Alert.alert(
@@ -66,9 +78,10 @@ export default function AnalysisScreen() {
   return (
     <View style={stiller.container}>
       <StatusBar style="light" />
-      <ScrollView contentContainerStyle={stiller.icerik} showsVerticalScrollIndicator={false}>
-        <View style={stiller.baslikSatiri}>
-          <Text style={stiller.baslik}>Analiz</Text>
+      <ScreenHeader
+        baslik="Analiz"
+        scrollY={scrollY}
+        sag={
           <Pressable
             onPress={profiliSifirlaSor}
             style={({ pressed }) => [
@@ -78,8 +91,18 @@ export default function AnalysisScreen() {
             <MaterialCommunityIcons name="account-cog-outline" size={16} color={ALTIN} />
             <Text style={stiller.profilButonuYazisi}>Profili Güncelle</Text>
           </Pressable>
-        </View>
-
+        }
+      />
+      <Animated.ScrollView
+        contentContainerStyle={[
+          stiller.icerik,
+          { paddingTop: insets.top + SCREEN_HEADER_ICERIK_YUKSEKLIGI + 12 },
+        ]}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: false,
+        })}>
         {PREMIUM_AKTIF ? (
           <>
             <View style={stiller.kart}>
@@ -135,7 +158,7 @@ export default function AnalysisScreen() {
             </Pressable>
           </View>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 }
@@ -147,20 +170,7 @@ const stiller = StyleSheet.create({
   },
   icerik: {
     paddingHorizontal: 24,
-    paddingTop: 80,
     paddingBottom: 60,
-  },
-  baslikSatiri: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 28,
-  },
-  baslik: {
-    color: ALTIN,
-    fontFamily: 'StoriesGrand',
-    fontSize: 34,
-    letterSpacing: 1,
   },
   profilButonu: {
     flexDirection: 'row',
@@ -190,7 +200,7 @@ const stiller = StyleSheet.create({
   kart: {
     borderWidth: 1,
     borderColor: ALTIN,
-    backgroundColor: 'rgba(10,11,16,0.6)',
+    backgroundColor: SURFACE,
     borderRadius: 20,
     padding: 20,
     marginBottom: 20,
@@ -250,7 +260,7 @@ const stiller = StyleSheet.create({
   kilitKarti: {
     borderWidth: 1,
     borderColor: ALTIN,
-    backgroundColor: 'rgba(10,11,16,0.6)',
+    backgroundColor: SURFACE,
     borderRadius: 20,
     padding: 24,
     alignItems: 'center',

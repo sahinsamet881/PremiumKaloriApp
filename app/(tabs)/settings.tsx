@@ -1,26 +1,64 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useRef, useState } from 'react';
-import { Alert, Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Alert, Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ALTIN, ALTIN_COK_SOLUK, ALTIN_ORTA_SOLUK, SIYAH } from '@/constants/luxTheme';
+import { ScreenHeader, SCREEN_HEADER_ICERIK_YUKSEKLIGI } from '@/components/screen-header';
+import {
+  ALTIN,
+  ALTIN_COK_SOLUK,
+  ALTIN_ORTA_SOLUK,
+  ALTIN_SOLUK,
+  DANGER,
+  SIYAH,
+  SURFACE,
+} from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
+import { bmrHesapla } from '@/nutrition/kalori';
+import { Cinsiyet } from '@/types';
+import {
+  AGRESIF_HEDEF_UYARISI,
+  kaloriTabani,
+  profilDogrula,
+  tabanlanmisKalori,
+} from '@/validation/profileValidator';
 
-type ProfilKartiProps = {
+type AlanGirisiProps = {
   etiket: string;
   deger: string;
-  genis?: boolean;
-  vurgulu?: boolean;
+  onDegisti: (metin: string) => void;
+  sayisal?: boolean;
+  ondalik?: boolean;
+  yari?: boolean;
 };
 
-function ProfilKarti({ etiket, deger, genis, vurgulu }: ProfilKartiProps) {
+function AlanGirisi({ etiket, deger, onDegisti, sayisal, ondalik, yari }: AlanGirisiProps) {
+  const yaz = (metin: string) => {
+    if (ondalik) {
+      onDegisti(metin.replace(/[^0-9.]/g, ''));
+      return;
+    }
+    if (sayisal) {
+      onDegisti(metin.replace(/[^0-9]/g, ''));
+      return;
+    }
+    onDegisti(metin);
+  };
+
   return (
-    <View style={[stiller.profilKarti, genis ? stiller.profilKartiGenis : stiller.profilKartiYari]}>
-      <Text style={stiller.profilKartiEtiket}>{etiket}</Text>
-      <Text style={[stiller.profilKartiDeger, vurgulu ? stiller.profilKartiDegerVurgulu : null]}>
-        {deger}
-      </Text>
+    <View style={[stiller.alan, yari ? stiller.alanYari : null]}>
+      <Text style={stiller.alanEtiketi}>{etiket}</Text>
+      <TextInput
+        style={stiller.alanGirisi}
+        value={deger}
+        onChangeText={yaz}
+        keyboardType={ondalik ? 'decimal-pad' : sayisal ? 'number-pad' : 'default'}
+        placeholderTextColor={ALTIN_SOLUK}
+        selectionColor={ALTIN}
+      />
     </View>
   );
 }
@@ -57,11 +95,42 @@ function LuksToggle({ etiket, aciklama, deger, onDegisti }: LuksToggleProps) {
 }
 
 export default function SettingsScreen() {
-  const { kullanici } = useVeri();
+  const { kullanici, profilKaydet } = useVeri();
+  const insets = useSafeAreaInsets();
+  const scrollY = useRef(new Animated.Value(0)).current;
   const [suHatirlaticisi, setSuHatirlaticisi] = useState(true);
   const [ogunHatirlaticisi, setOgunHatirlaticisi] = useState(true);
 
-  const isim = kullanici.isim.trim().length > 0 ? kullanici.isim.trim() : '—';
+  const [isimMetni, setIsimMetni] = useState(kullanici.isim);
+  const [yasMetni, setYasMetni] = useState(kullanici.yas > 0 ? String(kullanici.yas) : '');
+  const [boyMetni, setBoyMetni] = useState(kullanici.boy > 0 ? String(kullanici.boy) : '');
+  const [kiloMetni, setKiloMetni] = useState(kullanici.kilo > 0 ? String(kullanici.kilo) : '');
+  const [hedefKiloMetni, setHedefKiloMetni] = useState(
+    kullanici.hedefKilo > 0 ? String(kullanici.hedefKilo) : ''
+  );
+  const [cinsiyet, setCinsiyet] = useState<Cinsiyet>(kullanici.cinsiyet ?? 'kadin');
+  const [hataMesaji, setHataMesaji] = useState('');
+
+  const yasamCarpani = useMemo(() => {
+    const mevcutBmr = bmrHesapla(
+      kullanici.cinsiyet ?? 'kadin',
+      kullanici.kilo,
+      kullanici.boy,
+      kullanici.yas
+    );
+    if (mevcutBmr < 100 || kullanici.gunlukHedefKalori <= 0) {
+      return 1.4;
+    }
+    return Math.min(2.2, Math.max(1.1, kullanici.gunlukHedefKalori / mevcutBmr));
+  }, [kullanici]);
+
+  const yas = Number(yasMetni) || 0;
+  const boy = Number(boyMetni) || 0;
+  const kilo = Number(kiloMetni) || 0;
+  const hedefKilo = Number(hedefKiloMetni) || 0;
+
+  const hamKalori = Math.max(0, Math.round(bmrHesapla(cinsiyet, kilo, boy, yas) * yasamCarpani));
+  const { kalori: nihaiKalori, sabitlendi } = tabanlanmisKalori(hamKalori, cinsiyet);
 
   const iletisimeGec = () => {
     Alert.alert('Geliştirici Ekibi', 'Mesajın bize ulaştı sayılır, çok yakında buradayız!');
@@ -75,14 +144,65 @@ export default function SettingsScreen() {
     router.push('/(tabs)/history');
   };
 
-  return (
-    <ScrollView style={stiller.container} contentContainerStyle={stiller.icerik}>
-      <StatusBar style="light" />
-      <View style={stiller.ustBaslikSatiri}>
-        <MaterialCommunityIcons name="crown-outline" size={26} color={ALTIN} />
-        <Text style={stiller.baslik}>VIP Profil</Text>
-      </View>
+  const profiliKaydet = () => {
+    const sonuc = profilDogrula({
+      yas,
+      boy,
+      kilo,
+      hedefKilo,
+      cinsiyet,
+      hesaplananKalori: hamKalori,
+    });
 
+    if (sonuc.tur === 'engel') {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      setHataMesaji(sonuc.mesaj);
+      return;
+    }
+
+    setHataMesaji('');
+
+    const kaydet = () => {
+      profilKaydet({
+        isim: isimMetni.trim(),
+        yas,
+        boy,
+        kilo,
+        hedefKilo,
+        cinsiyet,
+        gunlukHedefKalori: nihaiKalori,
+        makroHedefleri: kullanici.makroHedefleri,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Kaydedildi', 'Profil bilgilerin güncellendi.');
+    };
+
+    if (sonuc.tur === 'uyari' && sonuc.mesaj === AGRESIF_HEDEF_UYARISI) {
+      Alert.alert('Hedefin İddialı Görünüyor', AGRESIF_HEDEF_UYARISI, [
+        { text: 'Hedefimi düzenle', style: 'cancel' },
+        { text: 'Devam et', onPress: kaydet },
+      ]);
+      return;
+    }
+
+    kaydet();
+  };
+
+  return (
+    <View style={stiller.container}>
+      <StatusBar style="light" />
+      <ScreenHeader baslik="Ayarlar" scrollY={scrollY} />
+      <Animated.ScrollView
+        style={stiller.container}
+        contentContainerStyle={[
+          stiller.icerik,
+          { paddingTop: insets.top + SCREEN_HEADER_ICERIK_YUKSEKLIGI + 12 },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+          useNativeDriver: false,
+        })}>
       <Pressable onPress={gecmiseGit} style={stiller.gecmisButonu}>
         <View style={stiller.gecmisIkonKutusu}>
           <MaterialCommunityIcons name="history" size={20} color={ALTIN} />
@@ -103,19 +223,76 @@ export default function SettingsScreen() {
       </Pressable>
 
       <Text style={stiller.bolumBasligi}>Kişisel Verilerim</Text>
-      <View style={stiller.profilIzgarasi}>
-        <ProfilKarti etiket="İsim" deger={isim} genis />
-        <ProfilKarti etiket="Yaş" deger={`${kullanici.yas}`} />
-        <ProfilKarti etiket="Boy" deger={`${kullanici.boy} cm`} />
-        <ProfilKarti etiket="Kilo" deger={`${kullanici.kilo} kg`} />
-        <ProfilKarti etiket="Hedef Kilo" deger={`${kullanici.hedefKilo} kg`} />
-        <ProfilKarti
-          etiket="Günlük Kalori İhtiyacı"
-          deger={`${kullanici.gunlukHedefKalori} kcal`}
-          genis
-          vurgulu
+      <View style={stiller.formKarti}>
+        <AlanGirisi etiket="İsim" deger={isimMetni} onDegisti={setIsimMetni} />
+
+        <View style={stiller.formSatiri}>
+          <AlanGirisi etiket="Yaş" deger={yasMetni} onDegisti={setYasMetni} sayisal yari />
+          <View style={[stiller.alan, stiller.alanYari]}>
+            <Text style={stiller.alanEtiketi}>Cinsiyet</Text>
+            <View style={stiller.cinsiyetSatiri}>
+              <Pressable
+                onPress={() => setCinsiyet('kadin')}
+                style={[
+                  stiller.cinsiyetSecenek,
+                  cinsiyet === 'kadin' ? stiller.cinsiyetSecenekAktif : null,
+                ]}>
+                <Text
+                  style={[
+                    stiller.cinsiyetYazi,
+                    cinsiyet === 'kadin' ? stiller.cinsiyetYaziAktif : null,
+                  ]}>
+                  Kadın
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setCinsiyet('erkek')}
+                style={[
+                  stiller.cinsiyetSecenek,
+                  cinsiyet === 'erkek' ? stiller.cinsiyetSecenekAktif : null,
+                ]}>
+                <Text
+                  style={[
+                    stiller.cinsiyetYazi,
+                    cinsiyet === 'erkek' ? stiller.cinsiyetYaziAktif : null,
+                  ]}>
+                  Erkek
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+
+        <View style={stiller.formSatiri}>
+          <AlanGirisi etiket="Boy (cm)" deger={boyMetni} onDegisti={setBoyMetni} sayisal yari />
+          <AlanGirisi etiket="Kilo (kg)" deger={kiloMetni} onDegisti={setKiloMetni} ondalik yari />
+        </View>
+
+        <AlanGirisi
+          etiket="Hedef Kilo (kg)"
+          deger={hedefKiloMetni}
+          onDegisti={setHedefKiloMetni}
+          ondalik
         />
+
+        {hataMesaji.length > 0 ? <Text style={stiller.hataMetni}>{hataMesaji}</Text> : null}
       </View>
+
+      <View style={stiller.kaloriKarti}>
+        <Text style={stiller.kaloriEtiketi}>Hesaplanan Günlük Kalori</Text>
+        <Text style={stiller.kaloriDegeri}>{nihaiKalori} kcal</Text>
+        {sabitlendi ? (
+          <Text style={stiller.kaloriNotu}>
+            Bu değerlerle hesaplanan kalori güvenli alt sınırın altına iniyordu;{' '}
+            {kaloriTabani(cinsiyet)} kcal olarak sabitlendi.
+          </Text>
+        ) : null}
+      </View>
+
+      <Pressable onPress={profiliKaydet} style={stiller.kaydetButonu}>
+        <MaterialCommunityIcons name="content-save-outline" size={18} color={SIYAH} />
+        <Text style={stiller.kaydetButonuYazisi}>Profili Kaydet</Text>
+      </Pressable>
 
       <Text style={stiller.bolumBasligi}>Hatırlatıcılar</Text>
       <View style={stiller.hatirlaticiKarti}>
@@ -148,7 +325,8 @@ export default function SettingsScreen() {
         <MaterialCommunityIcons name="star-four-points" size={20} color={SIYAH} />
         <Text style={stiller.premiumButonuYazisi}>Premium&apos;a Geç</Text>
       </Pressable>
-    </ScrollView>
+      </Animated.ScrollView>
+    </View>
   );
 }
 
@@ -159,20 +337,7 @@ const stiller = StyleSheet.create({
   },
   icerik: {
     paddingHorizontal: 24,
-    paddingTop: 80,
     paddingBottom: 60,
-  },
-  ustBaslikSatiri: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 32,
-  },
-  baslik: {
-    color: ALTIN,
-    fontFamily: 'StoriesGrand',
-    fontSize: 30,
-    letterSpacing: 1,
   },
   bolumBasligi: {
     color: ALTIN_ORTA_SOLUK,
@@ -253,28 +418,27 @@ const stiller = StyleSheet.create({
     letterSpacing: 0.3,
     marginTop: 4,
   },
-  profilIzgarasi: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 32,
-  },
-  profilKarti: {
+  formKarti: {
     borderWidth: 1,
     borderColor: ALTIN,
-    backgroundColor: 'rgba(10,11,16,0.6)',
+    backgroundColor: SURFACE,
     borderRadius: 16,
-    paddingVertical: 16,
-    paddingHorizontal: 18,
+    padding: 18,
+    marginBottom: 16,
   },
-  profilKartiGenis: {
-    width: '100%',
+  alan: {
+    marginBottom: 14,
   },
-  profilKartiYari: {
-    flexGrow: 1,
-    flexBasis: '46%',
+  alanYari: {
+    flex: 1,
+    marginBottom: 0,
   },
-  profilKartiEtiket: {
+  formSatiri: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 14,
+  },
+  alanEtiketi: {
     color: ALTIN_ORTA_SOLUK,
     fontSize: 12,
     fontWeight: '300',
@@ -282,19 +446,107 @@ const stiller = StyleSheet.create({
     letterSpacing: 1,
     marginBottom: 8,
   },
-  profilKartiDeger: {
+  alanGirisi: {
+    borderWidth: 1,
+    borderColor: ALTIN_COK_SOLUK,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     color: ALTIN,
-    fontSize: 20,
+    fontSize: 16,
+    fontWeight: '300',
+    letterSpacing: 0.3,
+    backgroundColor: SIYAH,
+  },
+  cinsiyetSatiri: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  cinsiyetSecenek: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: ALTIN_COK_SOLUK,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: SIYAH,
+  },
+  cinsiyetSecenekAktif: {
+    borderColor: ALTIN,
+    backgroundColor: 'rgba(232,195,124,0.14)',
+  },
+  cinsiyetYazi: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 14,
+    fontWeight: '300',
+    letterSpacing: 0.3,
+  },
+  cinsiyetYaziAktif: {
+    color: ALTIN,
+  },
+  hataMetni: {
+    color: DANGER,
+    fontSize: 13,
+    fontWeight: '400',
+    letterSpacing: 0.2,
+    marginTop: 2,
+  },
+  kaloriKarti: {
+    borderWidth: 1,
+    borderColor: ALTIN,
+    backgroundColor: 'rgba(232,195,124,0.06)',
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+  kaloriEtiketi: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 12,
+    fontWeight: '300',
+    textTransform: 'uppercase',
+    letterSpacing: 1.2,
+  },
+  kaloriDegeri: {
+    color: ALTIN,
+    fontSize: 30,
     fontWeight: '300',
     letterSpacing: 0.5,
+    marginTop: 8,
   },
-  profilKartiDegerVurgulu: {
-    fontSize: 26,
+  kaloriNotu: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 12,
+    fontWeight: '300',
+    lineHeight: 17,
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  kaydetButonu: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 54,
+    borderRadius: 27,
+    backgroundColor: ALTIN,
+    marginBottom: 36,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.5,
+    shadowRadius: 14,
+    elevation: 8,
+  },
+  kaydetButonuYazisi: {
+    color: SIYAH,
+    fontSize: 16,
+    fontWeight: '600',
+    letterSpacing: 0.4,
   },
   hatirlaticiKarti: {
     borderWidth: 1,
     borderColor: ALTIN,
-    backgroundColor: 'rgba(10,11,16,0.6)',
+    backgroundColor: SURFACE,
     borderRadius: 16,
     paddingHorizontal: 18,
     marginBottom: 32,
@@ -350,7 +602,7 @@ const stiller = StyleSheet.create({
     gap: 14,
     borderWidth: 1,
     borderColor: ALTIN,
-    backgroundColor: 'rgba(10,11,16,0.6)',
+    backgroundColor: SURFACE,
     borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 18,
