@@ -6,13 +6,14 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "minimalistkalori",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSHealthShareUsageDescription": "Adım sayısı, aktif enerji ve kilo verilerini okuyup günlük kalori hedefini kişiselleştirmek için Apple Health erişimi istiyoruz.",
-        "NSHealthUpdateUsageDescription": "Eklediğin öğünlerin kalori ve makro değerlerini ve su tüketimini Apple Health'e kaydetmek için erişim istiyoruz."
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSHealthShareUsageDescription": "Günlük kalori hedefini kişiselleştirmek için Apple Health'teki adım sayısı, aktif enerji ve kilo verilerini okuruz. Bu izin isteğe bağlıdır; vermezsen uygulama normal çalışmaya devam eder.",
+        "NSHealthUpdateUsageDescription": "Eklediğin öğünlerin kalori ve makrolarını ve su tüketimini Apple Health'e kaydederiz; böylece verilerin diğer sağlık uygulamalarınla tutarlı kalır. Bu izin isteğe bağlıdır."
       }
     },
     "android": {
@@ -37,16 +38,16 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#ffffff",
+          "backgroundColor": "#0A0B10",
           "dark": {
-            "backgroundColor": "#000000"
+            "backgroundColor": "#0A0B10"
           }
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Yemeğinin fotoğrafını çekmek ve ambalajlı ürünlerin barkodunu okuyup besin değerlerini getirmek için kameranı kullanmamıza izin ver."
+          "cameraPermission": "Tabağının fotoğrafını çekip yemeğini tanımak ve ambalajlı ürünlerin barkodunu okuyup besin değerlerini otomatik getirmek için kamerana erişmemiz gerekiyor. Kamera yalnızca sen bir tarama başlattığında kullanılır."
         }
       ]
     ],

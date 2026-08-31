@@ -32,6 +32,7 @@ import {
 } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
 import { BMR_FORMUL_ADI, bmrHesapla } from '@/nutrition/kalori';
+import { SU_BARDAK_VARSAYILAN, suHedefiOner } from '@/nutrition/su';
 import { MakroHedefleri } from '@/types';
 
 type TemelHedef = 'ver' | 'al' | 'koru';
@@ -752,6 +753,8 @@ export default function OnboardingScreen() {
         cinsiyet: cevaplar.cinsiyet ?? 'kadin',
         gunlukHedefKalori,
         makroHedefleri,
+        suHedefiMl: suHedefiOner(Number(cevaplar.kilo) || 0),
+        suBardakMl: SU_BARDAK_VARSAYILAN,
       });
       router.replace('/paywall?akis=onboarding');
     }, 1800);
@@ -885,6 +888,10 @@ export default function OnboardingScreen() {
                       placeholder="İsmin ne?"
                       placeholderTextColor={ALTIN_SOLUK}
                       selectionColor={ALTIN}
+                      textContentType="none"
+                      autoComplete="off"
+                      autoCorrect={false}
+                      spellCheck={false}
                       style={stiller.metinGirisi}
                       returnKeyType="done"
                     />

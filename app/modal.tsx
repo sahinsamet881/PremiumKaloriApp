@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useRef } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -7,6 +7,7 @@ import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { ALTIN, ALTIN_COK_SOLUK, ALTIN_ORTA_SOLUK, SIYAH, SURFACE } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
+import { ogunTuruEtiketi, ogunTuruGecerliMi } from '@/nutrition/ogun';
 import { Makrolar } from '@/types';
 
 type IkonAdi = 'bolt.fill' | 'star.fill' | 'magnifyingglass' | 'barcode.viewfinder';
@@ -72,9 +73,12 @@ function HizliCip({ isim, kalori, onPress }: HizliCipProps) {
 
 export default function ModalScreen() {
   const { sikKullanilanlar, favoriler, hizliKaloriEkle } = useVeri();
+  const { grup } = useLocalSearchParams<{ grup?: string }>();
+  const seciliTur = ogunTuruGecerliMi(grup) ? grup : undefined;
+  const turParam = seciliTur ? { grup: seciliTur } : undefined;
 
   const hizliEkle = (isim: string, kalori: number, makrolar?: Makrolar) => {
-    hizliKaloriEkle(kalori, isim, makrolar);
+    hizliKaloriEkle(kalori, isim, makrolar, seciliTur);
     router.dismissAll();
   };
 
@@ -86,26 +90,31 @@ export default function ModalScreen() {
         contentContainerStyle={stiller.icerik}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled">
-        <Text style={stiller.baslik}>Öğün Ekle</Text>
+        <Text style={stiller.baslik}>
+          {seciliTur ? `${ogunTuruEtiketi(seciliTur)} Ekle` : 'Öğün Ekle'}
+        </Text>
+        {seciliTur ? (
+          <Text style={stiller.grupNotu}>{ogunTuruEtiketi(seciliTur)} öğünü için ekliyorsun</Text>
+        ) : null}
 
         <View style={stiller.liste}>
           <LuksSecenekKarti
             ikon="bolt.fill"
             baslik="Elle Ekle"
             aciklama="İsim, porsiyon ve kalori gir"
-            onPress={() => router.push('/ogun-duzenle')}
+            onPress={() => router.push({ pathname: '/ogun-duzenle', params: turParam })}
           />
           <LuksSecenekKarti
             ikon="magnifyingglass"
             baslik="Yemek Ara"
             aciklama="Veritabanından seç, porsiyonu ayarla"
-            onPress={() => router.push('/search')}
+            onPress={() => router.push({ pathname: '/search', params: turParam })}
           />
           <LuksSecenekKarti
             ikon="barcode.viewfinder"
             baslik="Barkod Tara"
             aciklama="Ambalajlı ürünü kameradan oku"
-            onPress={() => router.push('/barkod')}
+            onPress={() => router.push({ pathname: '/barkod', params: turParam })}
           />
         </View>
 
@@ -169,6 +178,13 @@ const stiller = StyleSheet.create({
     fontFamily: 'StoriesGrand',
     fontSize: 24,
     letterSpacing: 0.5,
+  },
+  grupNotu: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 13,
+    fontWeight: '300',
+    letterSpacing: 0.3,
+    marginTop: -14,
   },
   liste: {
     gap: 12,

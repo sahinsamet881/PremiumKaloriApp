@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -15,12 +15,15 @@ const OFF_URL = 'https://world.openfoodfacts.org/api/v2/product';
 export default function BarkodScreen() {
   const [izin, izinIste] = useCameraPermissions();
   const { urunBul } = useVeri();
+  const { grup } = useLocalSearchParams<{ grup?: string }>();
   const [durum, setDurum] = useState<Durum>('tara');
   const [barkod, setBarkod] = useState('');
   const isliyorRef = useRef(false);
 
+  const turParam = grup ? { grup } : {};
+
   const elleGir = (kod: string) => {
-    router.replace({ pathname: '/ogun-duzenle', params: { barkod: kod } });
+    router.replace({ pathname: '/ogun-duzenle', params: { barkod: kod, ...turParam } });
   };
 
   const tekrarTara = () => {
@@ -38,7 +41,7 @@ export default function BarkodScreen() {
 
     const yerel = urunBul(kod);
     if (yerel) {
-      router.replace({ pathname: '/ogun-duzenle', params: { barkod: kod } });
+      router.replace({ pathname: '/ogun-duzenle', params: { barkod: kod, ...turParam } });
       return;
     }
 
@@ -84,6 +87,7 @@ export default function BarkodScreen() {
           p100: String(Math.round(Number(besin.proteins_100g) || 0)),
           c100: String(Math.round(Number(besin.carbohydrates_100g) || 0)),
           f100: String(Math.round(Number(besin.fat_100g) || 0)),
+          ...turParam,
         },
       });
     } catch {

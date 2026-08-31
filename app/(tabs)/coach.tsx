@@ -427,6 +427,10 @@ export default function CoachScreen() {
                 placeholder={cevrimici ? 'Koçuna bir şey sor...' : 'Bağlantı bekleniyor...'}
                 placeholderTextColor={ALTIN_SOLUK}
                 selectionColor={ALTIN}
+                textContentType="none"
+                autoComplete="off"
+                autoCorrect={false}
+                spellCheck={false}
                 multiline
                 maxLength={500}
                 textAlignVertical="center"

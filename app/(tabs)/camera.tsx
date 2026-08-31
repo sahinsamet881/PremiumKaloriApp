@@ -115,8 +115,11 @@ export default function CameraScreen() {
       }
 
       const data = await response.json();
-      let aiMetni = data.candidates[0].content.parts[0].text;
-      aiMetni = aiMetni.replace(/```json/g, '').replace(/```/g, '').trim();
+      const hamMetin: string = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+      const aiMetni = hamMetin.replace(/```json/g, '').replace(/```/g, '').trim();
+      if (aiMetni.length === 0) {
+        throw new Error('Yemek tanınamadı, lütfen daha net bir fotoğraf dene.');
+      }
       const analizSonucu = JSON.parse(aiMetni);
 
       setSonuc({

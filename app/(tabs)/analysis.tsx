@@ -22,8 +22,10 @@ import {
 import { useVeri } from '@/context/DataContext';
 import { haftalikHiz, hedefTahmini, siraliKayitlar, sonKayitlar } from '@/nutrition/kilo';
 
+const BELIRGIN_ASIM_KCAL = 200;
+
 const KALORI_ARALIKLARI: { gun: number; etiket: string; ucretsiz?: boolean }[] = [
-  { gun: 4, etiket: '4 Gün', ucretsiz: true },
+  { gun: 7, etiket: '7 Gün', ucretsiz: true },
   { gun: 30, etiket: '30 Gün' },
   { gun: 90, etiket: '90 Gün' },
   { gun: 0, etiket: 'Tümü' },
@@ -52,7 +54,7 @@ export default function AnalysisScreen() {
   const { kullanici, kiloKayitlari, ogunGecmisi, premiumAktif, profilSifirla } = useVeri();
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
-  const [aralik, setAralik] = useState(4);
+  const [aralik, setAralik] = useState(7);
 
   const gunlukKaloriTum = useMemo<GunlukKalori[]>(() => {
     const gunler = new Map<string, number>();
@@ -70,8 +72,19 @@ export default function AnalysisScreen() {
     [gunlukKaloriTum, aralik]
   );
 
-  const dortGunOzeti = useMemo(() => {
-    const esik = Date.now() - 4 * 24 * 60 * 60 * 1000;
+  const aralikTarihleri = useMemo(() => {
+    const bugun = new Date();
+    const bitis = bugun.toISOString().slice(0, 10);
+    if (aralik === 0) {
+      return { baslangic: gunlukKaloriTum[0]?.tarih ?? bitis, bitis };
+    }
+    const bas = new Date(bugun);
+    bas.setDate(bugun.getDate() - (aralik - 1));
+    return { baslangic: bas.toISOString().slice(0, 10), bitis };
+  }, [aralik, gunlukKaloriTum]);
+
+  const yediGunOzeti = useMemo(() => {
+    const esik = Date.now() - 7 * 24 * 60 * 60 * 1000;
     const gunler = new Map<string, number>();
     for (const kayit of ogunGecmisi) {
       if (kayit.zaman < esik) {
@@ -236,7 +249,12 @@ export default function AnalysisScreen() {
           </View>
 
           <View style={stiller.grafikSarici}>
-            <KaloriTrend veri={secilenVeri} hedef={kullanici.gunlukHedefKalori} />
+            <KaloriTrend
+              veri={secilenVeri}
+              hedef={kullanici.gunlukHedefKalori}
+              baslangic={aralikTarihleri.baslangic}
+              bitis={aralikTarihleri.bitis}
+            />
             {kilitli ? (
               <>
                 <BlurView
@@ -255,27 +273,34 @@ export default function AnalysisScreen() {
             ) : null}
           </View>
 
-          {aralik === 4 ? (
-            <View style={stiller.ozetSatiri}>
-              <View style={stiller.ozet}>
-                <Text style={stiller.ozetDeger}>
-                  {dortGunOzeti.gunSayisi ? dortGunOzeti.ortalama : '—'}
+          {aralik === 7 ? (
+            <>
+              <View style={stiller.ozetSatiri}>
+                <View style={stiller.ozet}>
+                  <Text style={stiller.ozetDeger}>
+                    {yediGunOzeti.gunSayisi ? yediGunOzeti.ortalama : '—'}
+                  </Text>
+                  <Text style={stiller.ozetEtiket}>Ort. kcal</Text>
+                </View>
+                <View style={stiller.ozet}>
+                  <Text style={stiller.ozetDeger}>{yediGunOzeti.gunSayisi}/7</Text>
+                  <Text style={stiller.ozetEtiket}>Kayıtlı gün</Text>
+                </View>
+              </View>
+              {yediGunOzeti.gunSayisi ? (
+                <Text
+                  style={[
+                    stiller.hedefYonu,
+                    yediGunOzeti.fark > BELIRGIN_ASIM_KCAL ? stiller.hedefYonuUyari : null,
+                  ]}>
+                  {yediGunOzeti.fark === 0
+                    ? 'Tam hedefinde'
+                    : yediGunOzeti.fark > 0
+                      ? `Hedefinin ${yediGunOzeti.fark} kcal üstünde`
+                      : `Hedefinin ${Math.abs(yediGunOzeti.fark)} kcal altında`}
                 </Text>
-                <Text style={stiller.ozetEtiket}>Ort. kcal</Text>
-              </View>
-              <View style={stiller.ozet}>
-                <Text style={stiller.ozetDeger}>{dortGunOzeti.gunSayisi}/4</Text>
-                <Text style={stiller.ozetEtiket}>Kayıtlı gün</Text>
-              </View>
-              <View style={stiller.ozet}>
-                <Text style={stiller.ozetDeger}>
-                  {dortGunOzeti.gunSayisi
-                    ? `${dortGunOzeti.fark > 0 ? '+' : ''}${dortGunOzeti.fark}`
-                    : '—'}
-                </Text>
-                <Text style={stiller.ozetEtiket}>Hedef farkı</Text>
-              </View>
-            </View>
+              ) : null}
+            </>
           ) : (
             <Text style={stiller.grafikNotu}>
               {premiumAktif
@@ -286,10 +311,21 @@ export default function AnalysisScreen() {
         </View>
 
         <View style={stiller.kart}>
-          <Text style={stiller.kartBasligi}>Makro Dağılımı</Text>
-          <MakroSatiri etiket="Protein" yuzde={proteinYuzde} />
-          <MakroSatiri etiket="Karbonhidrat" yuzde={karbYuzde} />
-          <MakroSatiri etiket="Yağ" yuzde={yagYuzde} />
+          <Text style={stiller.kartBasligi}>Hedef Dağılımın</Text>
+          {secilenVeri.length === 0 ? (
+            <Text style={stiller.makroBosDurum}>
+              Yeterli veri yok — birkaç öğün ekledikçe burası dolacak
+            </Text>
+          ) : (
+            <>
+              <MakroSatiri etiket="Protein" yuzde={proteinYuzde} />
+              <MakroSatiri etiket="Karbonhidrat" yuzde={karbYuzde} />
+              <MakroSatiri etiket="Yağ" yuzde={yagYuzde} />
+              <Text style={stiller.makroAciklama}>
+                Bunlar hedeflerin, bugünkü tüketimin değil.
+              </Text>
+            </>
+          )}
         </View>
       </Animated.ScrollView>
     </View>
@@ -514,6 +550,33 @@ const stiller = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 12,
     textAlign: 'center',
+  },
+  hedefYonu: {
+    color: ALTIN,
+    fontSize: 13,
+    fontWeight: '300',
+    letterSpacing: 0.3,
+    textAlign: 'center',
+    marginTop: 14,
+  },
+  hedefYonuUyari: {
+    color: DANGER,
+    fontWeight: '400',
+  },
+  makroBosDurum: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 13,
+    fontWeight: '300',
+    lineHeight: 19,
+    letterSpacing: 0.3,
+  },
+  makroAciklama: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 11,
+    fontWeight: '300',
+    fontStyle: 'italic',
+    letterSpacing: 0.3,
+    marginTop: 2,
   },
   makroSatiri: {
     marginBottom: 14,

@@ -16,10 +16,15 @@ import {
 } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
 import {
+  aylikEsdegerMetni,
+  DENEME_GUNU,
   GIZLILIK_URL,
   KULLANIM_SARTLARI_URL,
-  OTOMATIK_YENILEME_METNI,
-  PREMIUM_URUN,
+  otomatikYenilemeMetni,
+  planBul,
+  PLANLAR,
+  tasarrufYuzdesi,
+  VARSAYILAN_PLAN,
 } from '@/store/magaza';
 
 const AVANTAJLAR: {
@@ -48,7 +53,11 @@ export default function PaywallScreen() {
   const { akis } = useLocalSearchParams<{ akis?: string }>();
   const { premiumAktif, premiumMagazaHazir, premiumSatinAl, premiumGeriYukle } = useVeri();
   const [islemde, setIslemde] = useState(false);
+  const [seciliKimlik, setSeciliKimlik] = useState(
+    () => PLANLAR.find((plan) => plan.plan === VARSAYILAN_PLAN)?.kimlik ?? PLANLAR[0].kimlik
+  );
 
+  const seciliPlan = planBul(seciliKimlik);
   const onboardingAkisi = akis === 'onboarding';
 
   const kapat = () => {
@@ -65,12 +74,12 @@ export default function PaywallScreen() {
     }
     setIslemde(true);
     try {
-      const sonuc = await premiumSatinAl();
+      const sonuc = await premiumSatinAl(seciliKimlik);
       if (sonuc === 'basarili') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Alert.alert(
           'Deneme Başladı',
-          `${PREMIUM_URUN.denemeGunu} günlük ücretsiz deneme aktif. Bitiminden bir gün önce sana hatırlatacağız; iptal etmezsen ${PREMIUM_URUN.fiyatMetni} tahsil edilir.`,
+          `${DENEME_GUNU} günlük ücretsiz deneme aktif. Bitiminden bir gün önce sana hatırlatacağız; iptal etmezsen ${seciliPlan.baslik} plan için ${seciliPlan.fiyatMetni} tahsil edilir.`,
           [{ text: 'Anladım', onPress: kapat }]
         );
       } else if (sonuc === 'iptal') {
@@ -142,19 +151,47 @@ export default function PaywallScreen() {
             ))}
           </View>
 
-          <View style={stiller.fiyatKarti}>
-            <View style={stiller.fiyatUst}>
-              <Text style={stiller.fiyatDonem}>{PREMIUM_URUN.donem}</Text>
-              <Text style={stiller.fiyatDeger}>{PREMIUM_URUN.fiyatMetni}</Text>
-            </View>
-            <Text style={stiller.fiyatAlt}>
-              {PREMIUM_URUN.aylikYaklasik} · İlk {PREMIUM_URUN.denemeGunu} gün ücretsiz
-            </Text>
-            <Text style={stiller.fiyatUyari}>
-              {PREMIUM_URUN.denemeGunu} günlük deneme sonunda iptal etmezsen {PREMIUM_URUN.fiyatMetni}{' '}
-              otomatik tahsil edilir. Deneme bitmeden bir gün önce hatırlatırız.
-            </Text>
+          <View style={stiller.planListesi}>
+            {PLANLAR.map((plan) => {
+              const seciliMi = plan.kimlik === seciliKimlik;
+              const tasarruf = tasarrufYuzdesi(plan);
+              return (
+                <Pressable
+                  key={plan.kimlik}
+                  onPress={() => {
+                    Haptics.selectionAsync();
+                    setSeciliKimlik(plan.kimlik);
+                  }}
+                  style={[stiller.planKarti, seciliMi ? stiller.planKartiSecili : null]}>
+                  <View style={stiller.planSolAlan}>
+                    <View style={[stiller.radyo, seciliMi ? stiller.radyoSecili : null]}>
+                      {seciliMi ? <View style={stiller.radyoNokta} /> : null}
+                    </View>
+                    <View style={stiller.planMetin}>
+                      <View style={stiller.planBaslikSatiri}>
+                        <Text style={stiller.planBaslik}>{plan.baslik}</Text>
+                        {plan.rozet ? (
+                          <View style={stiller.planRozet}>
+                            <Text style={stiller.planRozetYazi}>{plan.rozet}</Text>
+                          </View>
+                        ) : null}
+                      </View>
+                      <Text style={stiller.planAylik}>{aylikEsdegerMetni(plan)}</Text>
+                      {tasarruf > 0 ? (
+                        <Text style={stiller.planTasarruf}>%{tasarruf} tasarruf</Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <Text style={stiller.planFiyat}>{plan.fiyatMetni}</Text>
+                </Pressable>
+              );
+            })}
           </View>
+
+          <Text style={stiller.denemeNotu}>
+            Seçili planda ilk {DENEME_GUNU} gün ücretsiz. Deneme bitmeden bir gün önce hatırlatırız;
+            iptal etmezsen {seciliPlan.baslik} plan için {seciliPlan.fiyatMetni} tahsil edilir.
+          </Text>
 
           {premiumAktif ? (
             <View style={stiller.aktifKutu}>
@@ -170,7 +207,7 @@ export default function PaywallScreen() {
                 islemde || !premiumMagazaHazir ? stiller.anaButonPasif : null,
               ]}>
               <Text style={stiller.anaButonYazisi}>
-                {islemde ? 'İşleniyor...' : `${PREMIUM_URUN.denemeGunu} Gün Ücretsiz Dene`}
+                {islemde ? 'İşleniyor...' : `${DENEME_GUNU} Gün Ücretsiz Dene`}
               </Text>
             </Pressable>
           )}
@@ -193,7 +230,7 @@ export default function PaywallScreen() {
             </Text>
           ) : null}
 
-          <Text style={stiller.yenilemeMetni}>{OTOMATIK_YENILEME_METNI}</Text>
+          <Text style={stiller.yenilemeMetni}>{otomatikYenilemeMetni(seciliPlan)}</Text>
 
           <View style={stiller.linkSatiri}>
             <Pressable onPress={() => Linking.openURL(KULLANIM_SARTLARI_URL)}>
@@ -303,45 +340,101 @@ const stiller = StyleSheet.create({
     fontWeight: '300',
     lineHeight: 18,
   },
-  fiyatKarti: {
+  planListesi: {
     alignSelf: 'stretch',
-    borderWidth: 1,
-    borderColor: ALTIN,
-    backgroundColor: SURFACE,
-    borderRadius: 18,
-    padding: 18,
-    gap: 6,
+    gap: 10,
   },
-  fiyatUst: {
+  planKarti: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'space-between',
+    gap: 12,
+    borderWidth: 1,
+    borderColor: ALTIN_COK_SOLUK,
+    backgroundColor: SURFACE,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  fiyatDonem: {
-    color: ALTIN_ORTA_SOLUK,
-    fontSize: 13,
-    fontWeight: '300',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
+  planKartiSecili: {
+    borderColor: ALTIN,
+    backgroundColor: 'rgba(232, 195, 124, 0.14)',
   },
-  fiyatDeger: {
+  planSolAlan: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  radyo: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: ALTIN_SOLUK,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radyoSecili: {
+    borderColor: ALTIN,
+  },
+  radyoNokta: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: ALTIN,
+  },
+  planMetin: {
+    flex: 1,
+    gap: 3,
+  },
+  planBaslikSatiri: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  planBaslik: {
     color: ALTIN,
-    fontSize: 24,
+    fontSize: 15,
     fontWeight: '400',
     letterSpacing: 0.3,
   },
-  fiyatAlt: {
+  planRozet: {
+    backgroundColor: ALTIN,
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  planRozetYazi: {
+    color: SIYAH,
+    fontSize: 9,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+  },
+  planAylik: {
     color: ALTIN_ORTA_SOLUK,
     fontSize: 12,
     fontWeight: '300',
     letterSpacing: 0.3,
   },
-  fiyatUyari: {
+  planTasarruf: {
+    color: ALTIN,
+    fontSize: 11,
+    fontWeight: '400',
+    letterSpacing: 0.3,
+  },
+  planFiyat: {
+    color: ALTIN,
+    fontSize: 17,
+    fontWeight: '400',
+    letterSpacing: 0.3,
+  },
+  denemeNotu: {
+    alignSelf: 'stretch',
     color: ALTIN_SOLUK,
     fontSize: 11,
     fontWeight: '300',
     lineHeight: 16,
-    marginTop: 6,
   },
   anaButon: {
     alignSelf: 'stretch',

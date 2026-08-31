@@ -15,9 +15,11 @@ export type GunlukKalori = { tarih: string; kalori: number };
 type KaloriTrendProps = {
   veri: GunlukKalori[];
   hedef: number;
+  baslangic?: string;
+  bitis?: string;
 };
 
-export function KaloriTrend({ veri, hedef }: KaloriTrendProps) {
+export function KaloriTrend({ veri, hedef, baslangic, bitis }: KaloriTrendProps) {
   if (veri.length === 0) {
     return (
       <View style={stiller.bosAlan}>
@@ -83,7 +85,7 @@ export function KaloriTrend({ veri, hedef }: KaloriTrendProps) {
         {Math.round(enYuksek)}
       </SvgText>
       <SvgText x={PAD_SOL} y={YUKSEKLIK - 7} fill={ALTIN_ORTA_SOLUK} fontSize={9}>
-        {veri[0].tarih.slice(5)}
+        {(baslangic ?? veri[0].tarih).slice(5)}
       </SvgText>
       <SvgText
         x={GENISLIK - PAD_SAG}
@@ -91,7 +93,7 @@ export function KaloriTrend({ veri, hedef }: KaloriTrendProps) {
         fill={ALTIN_ORTA_SOLUK}
         fontSize={9}
         textAnchor="end">
-        {veri[veri.length - 1].tarih.slice(5)}
+        {(bitis ?? veri[veri.length - 1].tarih).slice(5)}
       </SvgText>
     </Svg>
   );

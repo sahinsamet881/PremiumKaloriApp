@@ -14,9 +14,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CalorieRing } from '@/components/calorie-ring';
 import { MealRow } from '@/components/meal-row';
-import { ScreenHeader, SCREEN_HEADER_ICERIK_YUKSEKLIGI } from '@/components/screen-header';
 import { ALTIN, ALTIN_ORTA_SOLUK, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
+import { OGUN_TURLERI, ogunTuruCoz } from '@/nutrition/ogun';
+import { SU_BARDAK_VARSAYILAN, SU_HEDEFI_VARSAYILAN } from '@/nutrition/su';
+import { OgunTuru } from '@/types';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -82,22 +84,6 @@ function MakroKutu({
   );
 }
 
-const OGUN_GRUPLARI = ['Kahvaltı', 'Öğle', 'Ara Öğün', 'Akşam'];
-
-function ogunGrubunuBul(saat: string) {
-  const dilim = parseInt(saat.split(':')[0], 10);
-  if (dilim >= 5 && dilim < 11) {
-    return 'Kahvaltı';
-  }
-  if (dilim >= 11 && dilim < 15) {
-    return 'Öğle';
-  }
-  if (dilim >= 15 && dilim < 18) {
-    return 'Ara Öğün';
-  }
-  return 'Akşam';
-}
-
 const GUNUN_IPUCLARI = [
   'Su içmek metabolizmanı hızlandırır. Asalet disiplinde gizlidir.',
   'Yavaş yemek, mükemmelliğin ilk kuralıdır.',
@@ -106,27 +92,39 @@ const GUNUN_IPUCLARI = [
   'Küçük adımlar, kalıcı zaferlerin temelidir.',
 ];
 
-const SU_HEDEFI_ML = 2500;
-const SU_ARTIS_ML = 250;
 
 export default function TodayScreen() {
-  const { kullanici, ogunler, onboardingTamamlandi, girisYapildi, saglikAktifKalori, saglikSuKaydet } =
-    useVeri();
+  const {
+    kullanici,
+    ogunler,
+    onboardingTamamlandi,
+    girisYapildi,
+    kvkkOnaylandi,
+    saglikAktifKalori,
+    saglikSuKaydet,
+  } = useVeri();
   const [gununIpucu] = useState(
     () => GUNUN_IPUCLARI[Math.floor(Math.random() * GUNUN_IPUCLARI.length)]
   );
   const [suMiktari, setSuMiktari] = useState(0);
   const suAnimasyonu = useSharedValue(0);
 
+  const suHedefi = kullanici.suHedefiMl || SU_HEDEFI_VARSAYILAN;
+  const suBardak = kullanici.suBardakMl || SU_BARDAK_VARSAYILAN;
+
   useEffect(() => {
-    if (onboardingTamamlandi === false) {
+    if (kvkkOnaylandi === false) {
+      router.replace('/kvkk');
+      return;
+    }
+    if (kvkkOnaylandi === true && onboardingTamamlandi === false) {
       router.replace('/onboarding');
       return;
     }
-    if (onboardingTamamlandi && girisYapildi === false) {
+    if (kvkkOnaylandi === true && onboardingTamamlandi && girisYapildi === false) {
       router.replace('/auth');
     }
-  }, [onboardingTamamlandi, girisYapildi]);
+  }, [kvkkOnaylandi, onboardingTamamlandi, girisYapildi]);
 
   useFocusEffect(
     useCallback(() => {
@@ -135,7 +133,7 @@ export default function TodayScreen() {
     }, [])
   );
 
-  const suYuzdesi = Math.min(100, (suMiktari / SU_HEDEFI_ML) * 100);
+  const suYuzdesi = Math.min(100, (suMiktari / suHedefi) * 100);
 
   useEffect(() => {
     suAnimasyonu.value = withSpring(suYuzdesi, SU_YAYI);
@@ -147,12 +145,17 @@ export default function TodayScreen() {
 
   const suEkle = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    setSuMiktari((onceki) => onceki + SU_ARTIS_ML);
-    saglikSuKaydet(SU_ARTIS_ML);
+    setSuMiktari((onceki) => onceki + suBardak);
+    saglikSuKaydet(suBardak);
   };
 
   const tarihKaydir = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  const bosOgunEkle = (tur: OgunTuru) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({ pathname: '/modal', params: { grup: tur } });
   };
 
   const alinanMakrolar = ogunler.reduce(
@@ -167,21 +170,23 @@ export default function TodayScreen() {
     { protein: 0, karbonhidrat: 0, yag: 0 }
   );
 
-  const gruplanmisOgunler = OGUN_GRUPLARI.map((grup) => ({
-    grup,
-    liste: ogunler.filter((ogun) => ogunGrubunuBul(ogun.eklenmeSaati) === grup),
-  })).filter((bolum) => bolum.liste.length > 0);
+  const gruplanmisOgunler = OGUN_TURLERI.map(({ tur, etiket }) => ({
+    tur,
+    etiket,
+    liste: ogunler.filter((ogun) => ogunTuruCoz(ogun) === tur),
+  }));
 
-  if (!onboardingTamamlandi || !girisYapildi) {
+  if (kvkkOnaylandi !== true || !onboardingTamamlandi || !girisYapildi) {
     return <View style={styles.kok} />;
   }
 
   return (
     <View style={styles.kok}>
-      <ScreenHeader baslik="Bugün" />
       <SafeAreaView style={styles.kok}>
-        <View style={styles.panel}>
-          <View style={[styles.kutu, styles.ogunlerKutusu]}>
+        <ScrollView
+          contentContainerStyle={styles.panel}
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.kutu}>
             <View style={styles.ogunlerBaslikSatiri}>
               <View style={styles.tarihNavigator}>
                 <Pressable onPress={tarihKaydir} hitSlop={8} style={styles.tarihOk}>
@@ -225,23 +230,26 @@ export default function TodayScreen() {
               </View>
             </View>
 
-            <ScrollView
-              style={styles.ogunListesi}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.ogunListesiIcerik}>
-              {ogunler.length === 0 ? (
-                <Text style={styles.bosDurum}>Henüz bir şey eklenmedi</Text>
-              ) : (
-                gruplanmisOgunler.map((bolum) => (
-                  <View key={bolum.grup} style={styles.grupBolumu}>
-                    <Text style={styles.grupBasligi}>{bolum.grup}</Text>
-                    {bolum.liste.map((ogun) => (
-                      <MealRow key={ogun.id} {...ogun} />
-                    ))}
-                  </View>
-                ))
-              )}
-            </ScrollView>
+            <View style={styles.ogunListesi}>
+              {gruplanmisOgunler.map((bolum) => (
+                <View key={bolum.tur} style={styles.grupBolumu}>
+                  <Text style={styles.grupBasligi}>{bolum.etiket}</Text>
+                  {bolum.liste.length > 0 ? (
+                    bolum.liste.map((ogun) => <MealRow key={ogun.id} {...ogun} />)
+                  ) : (
+                    <Pressable
+                      onPress={() => bosOgunEkle(bolum.tur)}
+                      style={({ pressed }) => [
+                        styles.bosOgunSatiri,
+                        pressed ? styles.bosOgunSatiriBasili : null,
+                      ]}>
+                      <Text style={styles.bosOgunYazisi}>Henüz eklemedin</Text>
+                      <MaterialCommunityIcons name="plus" size={18} color={ALTIN_SOLUK} />
+                    </Pressable>
+                  )}
+                </View>
+              ))}
+            </View>
           </View>
 
           <View style={[styles.kutu, styles.suKutusu]}>
@@ -252,19 +260,19 @@ export default function TodayScreen() {
                   <MaterialCommunityIcons name="water" size={20} color={ALTIN} />
                 </View>
                 <Text style={styles.suMiktariYazisi} numberOfLines={1} adjustsFontSizeToFit>
-                  {suMiktari} / {SU_HEDEFI_ML} ml
+                  {suMiktari} / {suHedefi} ml
                 </Text>
               </View>
               <ParlakButon onPress={suEkle} style={styles.suEkleButonu}>
-                <Text style={styles.suEkleButonuYazisi}>+ {SU_ARTIS_ML}ml</Text>
+                <Text style={styles.suEkleButonuYazisi}>+ {suBardak}ml</Text>
               </ParlakButon>
             </View>
           </View>
-        </View>
 
-        <View style={styles.footer}>
-          <Text style={styles.sozMetni}>{gununIpucu}</Text>
-        </View>
+          <View style={styles.footer}>
+            <Text style={styles.sozMetni}>{gununIpucu}</Text>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
@@ -276,10 +284,10 @@ const styles = StyleSheet.create({
     backgroundColor: SIYAH,
   },
   panel: {
-    flex: 1,
+    flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: SCREEN_HEADER_ICERIK_YUKSEKLIGI + 4,
-    paddingBottom: 10,
+    paddingTop: 8,
+    paddingBottom: 20,
     gap: 14,
   },
   kutu: {
@@ -288,9 +296,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 215, 0, 0.4)',
     borderRadius: 20,
     padding: 18,
-  },
-  ogunlerKutusu: {
-    flex: 1,
   },
   ogunlerBaslikSatiri: {
     flexDirection: 'row',
@@ -394,18 +399,25 @@ const styles = StyleSheet.create({
     backgroundColor: ALTIN,
   },
   ogunListesi: {
-    flex: 1,
+    marginTop: 4,
   },
-  ogunListesiIcerik: {
-    paddingVertical: 4,
+  bosOgunSatiri: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+    borderRadius: 12,
   },
-  bosDurum: {
+  bosOgunSatiriBasili: {
+    backgroundColor: 'rgba(232,195,124,0.06)',
+  },
+  bosOgunYazisi: {
     color: ALTIN_ORTA_SOLUK,
     fontSize: 13,
     fontWeight: '300',
-    textAlign: 'center',
     letterSpacing: 0.3,
-    paddingVertical: 12,
+    opacity: 0.7,
   },
   grupBolumu: {
     marginBottom: 4,
@@ -420,9 +432,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   suKutusu: {
-    flex: 0.15,
     padding: 0,
     overflow: 'hidden',
+    minHeight: 62,
   },
   suIcerik: {
     flex: 1,
@@ -481,6 +493,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.3,
   },
   footer: {
+    marginTop: 'auto',
     paddingHorizontal: 24,
     paddingTop: 4,
     paddingBottom: 12,

@@ -1,7 +1,8 @@
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import {
@@ -30,6 +31,8 @@ function porsiyonKalori(kalori100: number, porsiyonGram: number): number {
 
 export default function SearchScreen() {
   const { turkYemekleri } = useVeri();
+  const insets = useSafeAreaInsets();
+  const { grup } = useLocalSearchParams<{ grup?: string }>();
   const [sorgu, setSorgu] = useState('');
 
   const sonuclar = useMemo<AramaSatiri[]>(() => {
@@ -38,6 +41,8 @@ export default function SearchScreen() {
       return [];
     }
 
+    const turParam = grup ? { grup } : {};
+
     const yemekler: AramaSatiri[] = yemekAra(sorgu, turkYemekleri).map((yemek) => {
       const kalori = porsiyonKalori(yemek.kalori100, yemek.porsiyonGram);
       return {
@@ -45,7 +50,8 @@ export default function SearchScreen() {
         isim: yemek.isim,
         altBilgi: `${yemek.porsiyonAdi} (${yemek.porsiyonGram} g)`,
         kalori,
-        git: () => router.push({ pathname: '/ogun-duzenle', params: { yemekId: yemek.id } }),
+        git: () =>
+          router.push({ pathname: '/ogun-duzenle', params: { yemekId: yemek.id, ...turParam } }),
       };
     });
 
@@ -56,14 +62,15 @@ export default function SearchScreen() {
       isim: besin.isim,
       altBilgi: besin.porsiyon,
       kalori: besin.kalori,
-      git: () => router.push({ pathname: '/ogun-duzenle', params: { besinId: besin.id } }),
+      git: () =>
+        router.push({ pathname: '/ogun-duzenle', params: { besinId: besin.id, ...turParam } }),
     }));
 
     return [...yemekler, ...besinler];
-  }, [sorgu, turkYemekleri]);
+  }, [sorgu, turkYemekleri, grup]);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <StatusBar style="light" />
       <Pressable onPress={() => router.back()} style={styles.geriButonu}>
         <IconSymbol name="chevron.left" size={16} color={ALTIN} />
@@ -78,6 +85,10 @@ export default function SearchScreen() {
           onChangeText={setSorgu}
           keyboardType="default"
           returnKeyType="search"
+          textContentType="none"
+          autoComplete="off"
+          autoCorrect={false}
+          spellCheck={false}
           placeholder="Ne yedin? (ör. mercimek corbasi)"
           placeholderTextColor={ALTIN_SOLUK}
           selectionColor={ALTIN}
@@ -122,7 +133,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: SIYAH,
-    paddingTop: 60,
     paddingHorizontal: 24,
   },
   geriButonu: {

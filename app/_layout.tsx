@@ -59,6 +59,10 @@ export default function RootLayout() {
             />
             <Stack.Screen name="barkod" options={{ presentation: 'modal', headerShown: false }} />
             <Stack.Screen name="paywall" options={{ presentation: 'modal', headerShown: false }} />
+            <Stack.Screen
+              name="kvkk"
+              options={{ headerShown: false, gestureEnabled: false }}
+            />
             <Stack.Screen name="search" options={{ headerShown: false }} />
             <Stack.Screen
               name="onboarding"

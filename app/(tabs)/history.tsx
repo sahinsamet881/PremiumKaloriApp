@@ -1,6 +1,8 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useRef } from 'react';
-import { Animated, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useRef } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader, SCREEN_HEADER_ICERIK_YUKSEKLIGI } from '@/components/screen-header';
@@ -40,13 +42,48 @@ function ayGunleriniUret() {
 }
 
 export default function HistoryScreen() {
-  const { kullanici } = useVeri();
+  const { kullanici, ogunGecmisi } = useVeri();
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const haftaninGunleri = haftaninGunleriniUret();
   const aktifGunSayisi = Math.min(Math.max(kullanici.seriGunu, 0), 7);
   const { liste: ayGunleri, bugununGunu } = ayGunleriniUret();
+
+  const kayitliGunler = useMemo(() => {
+    const bugun = new Date();
+    const kume = new Set<number>();
+    for (const kayit of ogunGecmisi) {
+      const tarih = new Date(kayit.zaman);
+      if (
+        tarih.getFullYear() === bugun.getFullYear() &&
+        tarih.getMonth() === bugun.getMonth()
+      ) {
+        kume.add(tarih.getDate());
+      }
+    }
+    return kume;
+  }, [ogunGecmisi]);
+
+  if (ogunGecmisi.length === 0) {
+    return (
+      <View style={stiller.container}>
+        <StatusBar style="light" />
+        <ScreenHeader baslik="Geçmiş" />
+        <View
+          style={[
+            stiller.bosDurum,
+            { paddingTop: insets.top + SCREEN_HEADER_ICERIK_YUKSEKLIGI },
+          ]}>
+          <MaterialCommunityIcons name="calendar-blank-outline" size={48} color={ALTIN_SOLUK} />
+          <Text style={stiller.bosBaslik}>Henüz kayıt yok — ilk öğününü ekleyerek başla</Text>
+          <Pressable onPress={() => router.replace('/(tabs)')} style={stiller.bosButon}>
+            <Text style={stiller.bosButonYazi}>Bugün&apos;e Git</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={stiller.container}>
@@ -88,13 +125,19 @@ export default function HistoryScreen() {
           <View style={stiller.takvimIzgarasi}>
             {ayGunleri.map((gun) => {
               const bugunMu = gun === bugununGunu;
+              const kayitVar = kayitliGunler.has(gun);
               return (
                 <View
                   key={gun}
-                  style={[stiller.takvimKutusu, bugunMu ? stiller.takvimKutusuBugun : null]}>
+                  style={[
+                    stiller.takvimKutusu,
+                    kayitVar ? stiller.takvimKutusuKayitli : null,
+                    bugunMu ? stiller.takvimKutusuBugun : null,
+                  ]}>
                   <Text
                     style={[
                       stiller.takvimKutusuYazisi,
+                      kayitVar ? stiller.takvimKutusuYazisiKayitli : null,
                       bugunMu ? stiller.takvimKutusuYazisiBugun : null,
                     ]}>
                     {gun}
@@ -187,10 +230,14 @@ const stiller = StyleSheet.create({
     width: '11%',
     aspectRatio: 1,
     borderWidth: 1,
-    borderColor: ALTIN_SOLUK,
+    borderColor: ALTIN_COK_SOLUK,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  takvimKutusuKayitli: {
+    borderColor: ALTIN,
+    backgroundColor: 'rgba(232,195,124,0.18)',
   },
   takvimKutusuBugun: {
     backgroundColor: ALTIN,
@@ -200,9 +247,50 @@ const stiller = StyleSheet.create({
     color: ALTIN_ORTA_SOLUK,
     fontSize: 11,
     fontWeight: '300',
+    opacity: 0.5,
+  },
+  takvimKutusuYazisiKayitli: {
+    color: ALTIN,
+    fontWeight: '400',
+    opacity: 1,
   },
   takvimKutusuYazisiBugun: {
     color: SIYAH,
     fontWeight: '600',
+    opacity: 1,
+  },
+  bosDurum: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 40,
+    gap: 18,
+  },
+  bosBaslik: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 15,
+    fontWeight: '300',
+    lineHeight: 22,
+    letterSpacing: 0.3,
+    textAlign: 'center',
+  },
+  bosButon: {
+    marginTop: 4,
+    borderWidth: 1,
+    borderColor: ALTIN,
+    borderRadius: 18,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    shadowColor: '#FFD700',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  bosButonYazi: {
+    color: ALTIN,
+    fontSize: 14,
+    fontWeight: '400',
+    letterSpacing: 0.4,
   },
 });

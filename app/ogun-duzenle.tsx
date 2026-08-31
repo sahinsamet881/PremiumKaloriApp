@@ -25,11 +25,18 @@ import {
 import { ALTIN, ALTIN_COK_SOLUK, ALTIN_ORTA_SOLUK, ALTIN_SOLUK, SIYAH, SURFACE } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
 import { YEREL_BESIN_VERITABANI } from '@/data/foodDatabase';
+import {
+  OGUN_TURLERI,
+  ogunTuruGecerliMi,
+  ogunTuruSaattenTuret,
+  suAnkiOgunTuru,
+} from '@/nutrition/ogun';
+import { OgunTuru } from '@/types';
 
 type Taban = { kalori: number; protein: number; karbonhidrat: number; yag: number };
 
 export default function OgunDuzenleScreen() {
-  const { id, besinId, yemekId, barkod, ad, k100, p100, c100, f100 } = useLocalSearchParams<{
+  const { id, besinId, yemekId, barkod, ad, k100, p100, c100, f100, grup } = useLocalSearchParams<{
     id?: string;
     besinId?: string;
     yemekId?: string;
@@ -39,6 +46,7 @@ export default function OgunDuzenleScreen() {
     p100?: string;
     c100?: string;
     f100?: string;
+    grup?: string;
   }>();
   const { ogunler, hizliKaloriEkle, ogunGuncelle, urunBul, urunEkle, turkYemekBul } = useVeri();
 
@@ -131,6 +139,13 @@ export default function OgunDuzenleScreen() {
   );
   const [yagMetni, setYagMetni] = useState(mevcutOgun?.makrolar ? String(mevcutOgun.makrolar.yag) : '');
 
+  const baslangicOgunTuru: OgunTuru = mevcutOgun
+    ? mevcutOgun.ogunTuru ?? ogunTuruSaattenTuret(mevcutOgun.eklenmeSaati)
+    : ogunTuruGecerliMi(grup)
+      ? grup
+      : suAnkiOgunTuru();
+  const [ogunTuru, setOgunTuru] = useState<OgunTuru>(baslangicOgunTuru);
+
   const olcekli = baslangic.taban;
   const gram = Math.max(0, (Number(miktar) || 0) * birimGram(birim));
 
@@ -163,7 +178,7 @@ export default function OgunDuzenleScreen() {
     };
 
     if (duzenlemeMi && mevcutOgun) {
-      ogunGuncelle(mevcutOgun.id, { isim, kalori: hesaplanan.kalori, makrolar });
+      ogunGuncelle(mevcutOgun.id, { isim, kalori: hesaplanan.kalori, makrolar, ogunTuru });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
       return;
@@ -181,7 +196,7 @@ export default function OgunDuzenleScreen() {
       });
     }
 
-    hizliKaloriEkle(hesaplanan.kalori, isim, makrolar);
+    hizliKaloriEkle(hesaplanan.kalori, isim, makrolar, ogunTuru);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     router.dismissAll();
   };
@@ -213,8 +228,31 @@ export default function OgunDuzenleScreen() {
                 placeholder="Örn: Yulaf Ezmesi"
                 placeholderTextColor={ALTIN_SOLUK}
                 selectionColor={ALTIN}
+                textContentType="none"
+                autoComplete="off"
+                autoCorrect={false}
+                spellCheck={false}
                 style={stiller.girisAlani}
               />
+            </View>
+
+            <View style={stiller.alan}>
+              <Text style={stiller.alanEtiketi}>Öğün Türü</Text>
+              <View style={stiller.turSatiri}>
+                {OGUN_TURLERI.map(({ tur, etiket }) => {
+                  const seciliMi = tur === ogunTuru;
+                  return (
+                    <Pressable
+                      key={tur}
+                      onPress={() => setOgunTuru(tur)}
+                      style={[stiller.turCip, seciliMi ? stiller.turCipAktif : null]}>
+                      <Text style={[stiller.turCipYazi, seciliMi ? stiller.turCipYaziAktif : null]}>
+                        {etiket}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             </View>
 
             <PorsiyonSecici birim={birim} miktar={miktar} onBirim={setBirim} onMiktar={setMiktar} />
@@ -394,6 +432,34 @@ const stiller = StyleSheet.create({
     fontSize: 10,
     fontWeight: '300',
     marginTop: 3,
+  },
+  turSatiri: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  turCip: {
+    flexGrow: 1,
+    flexBasis: '47%',
+    borderWidth: 1,
+    borderColor: ALTIN_COK_SOLUK,
+    borderRadius: 12,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: SIYAH,
+  },
+  turCipAktif: {
+    borderColor: ALTIN,
+    backgroundColor: 'rgba(232, 195, 124, 0.14)',
+  },
+  turCipYazi: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 13,
+    fontWeight: '300',
+    letterSpacing: 0.3,
+  },
+  turCipYaziAktif: {
+    color: ALTIN,
   },
   manuelAlan: {
     gap: 16,

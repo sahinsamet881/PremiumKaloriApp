@@ -71,6 +71,10 @@ export default function KiloEkleScreen() {
             placeholder="Not (opsiyonel)"
             placeholderTextColor={ALTIN_SOLUK}
             selectionColor={ALTIN}
+            textContentType="none"
+            autoComplete="off"
+            autoCorrect={false}
+            spellCheck={false}
             style={stiller.notGirisi}
           />
 
