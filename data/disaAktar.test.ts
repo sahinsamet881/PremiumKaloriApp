@@ -6,7 +6,7 @@ const ogun: GecmisKaydi[] = [
     id: '1',
     isim: 'Menemen',
     kalori: 250,
-    makrolar: { protein: 13, karbonhidrat: 8, yag: 19, porsiyon: '1 Porsiyon' },
+    makrolar: { protein: 13, karbonhidrat: 8, yag: 19, lif: 3, porsiyon: '1 Porsiyon' },
     zaman: new Date('2026-08-20T08:30:00Z').getTime(),
   },
   {
@@ -29,13 +29,13 @@ describe('verileriCsvUret', () => {
 
   it('her kayıt tipi için satır üretir', () => {
     expect(csv).toContain('ogun,2026-08-20');
-    expect(csv).toContain('su,2026-08-20,,,,,,,1500');
-    expect(csv).toContain('kilo,2026-08-19,,,,,,,,78.4,sabah');
+    expect(csv).toContain('su,2026-08-20,,,,,,,,1500');
+    expect(csv).toContain('kilo,2026-08-19,,,,,,,,,78.4,sabah');
   });
 
   it('makrolu öğünün makroları dolu, makrosuzunki boş', () => {
     const menemenSatiri = satirlar.find((s) => s.startsWith('ogun') && s.includes('Menemen'));
-    expect(menemenSatiri).toContain(',250,13,8,19,');
+    expect(menemenSatiri).toContain(',250,13,8,19,3,');
   });
 
   it('virgül ve tırnak içeren alanları CSV kurallarına göre kaçırır', () => {

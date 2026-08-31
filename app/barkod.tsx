@@ -87,6 +87,7 @@ export default function BarkodScreen() {
           p100: String(Math.round(Number(besin.proteins_100g) || 0)),
           c100: String(Math.round(Number(besin.carbohydrates_100g) || 0)),
           f100: String(Math.round(Number(besin.fat_100g) || 0)),
+          l100: String(Math.round(Number(besin.fiber_100g) || 0)),
           ...turParam,
         },
       });

@@ -16,6 +16,7 @@ import { CalorieRing } from '@/components/calorie-ring';
 import { MealRow } from '@/components/meal-row';
 import { ALTIN, ALTIN_ORTA_SOLUK, ALTIN_SOLUK, SIYAH } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
+import { LIF_HEDEF_ETIKETI, LIF_HEDEF_MAX } from '@/nutrition/lif';
 import { OGUN_TURLERI, ogunTuruCoz } from '@/nutrition/ogun';
 import { SU_BARDAK_VARSAYILAN, SU_HEDEFI_VARSAYILAN } from '@/nutrition/su';
 import { OgunTuru } from '@/types';
@@ -62,17 +63,19 @@ function MakroKutu({
   etiket,
   alinan,
   hedef,
+  hedefMetni,
 }: {
   etiket: string;
   alinan: number;
   hedef: number;
+  hedefMetni?: string;
 }) {
   const oran = hedef > 0 ? Math.min(100, (alinan / hedef) * 100) : 0;
 
   return (
     <View style={styles.makroKutu}>
       <Text style={styles.makroKutuDeger} adjustsFontSizeToFit numberOfLines={1}>
-        {Math.round(alinan)} / {hedef}g
+        {Math.round(alinan)} / {hedefMetni ?? hedef}g
       </Text>
       <Text style={styles.makroKutuEtiket} adjustsFontSizeToFit numberOfLines={1}>
         {etiket}
@@ -165,9 +168,10 @@ export default function TodayScreen() {
             protein: toplam.protein + ogun.makrolar.protein,
             karbonhidrat: toplam.karbonhidrat + ogun.makrolar.karbonhidrat,
             yag: toplam.yag + ogun.makrolar.yag,
+            lif: toplam.lif + (ogun.makrolar.lif ?? 0),
           }
         : toplam,
-    { protein: 0, karbonhidrat: 0, yag: 0 }
+    { protein: 0, karbonhidrat: 0, yag: 0, lif: 0 }
   );
 
   const gruplanmisOgunler = OGUN_TURLERI.map(({ tur, etiket }) => ({
@@ -226,6 +230,12 @@ export default function TodayScreen() {
                   etiket="Yağ"
                   alinan={alinanMakrolar.yag}
                   hedef={kullanici.makroHedefleri.yag}
+                />
+                <MakroKutu
+                  etiket="Lif"
+                  alinan={alinanMakrolar.lif}
+                  hedef={LIF_HEDEF_MAX}
+                  hedefMetni={LIF_HEDEF_ETIKETI}
                 />
               </View>
             </View>
@@ -358,11 +368,13 @@ const styles = StyleSheet.create({
   },
   makroSatiri: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
     alignSelf: 'stretch',
   },
   makroKutu: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '47%',
     borderWidth: 1,
     borderColor: 'rgba(232,195,124,0.25)',
     borderRadius: 12,

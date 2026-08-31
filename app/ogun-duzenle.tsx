@@ -33,21 +33,23 @@ import {
 } from '@/nutrition/ogun';
 import { OgunTuru } from '@/types';
 
-type Taban = { kalori: number; protein: number; karbonhidrat: number; yag: number };
+type Taban = { kalori: number; protein: number; karbonhidrat: number; yag: number; lif: number };
 
 export default function OgunDuzenleScreen() {
-  const { id, besinId, yemekId, barkod, ad, k100, p100, c100, f100, grup } = useLocalSearchParams<{
-    id?: string;
-    besinId?: string;
-    yemekId?: string;
-    barkod?: string;
-    ad?: string;
-    k100?: string;
-    p100?: string;
-    c100?: string;
-    f100?: string;
-    grup?: string;
-  }>();
+  const { id, besinId, yemekId, barkod, ad, k100, p100, c100, f100, l100, grup } =
+    useLocalSearchParams<{
+      id?: string;
+      besinId?: string;
+      yemekId?: string;
+      barkod?: string;
+      ad?: string;
+      k100?: string;
+      p100?: string;
+      c100?: string;
+      f100?: string;
+      l100?: string;
+      grup?: string;
+    }>();
   const { ogunler, hizliKaloriEkle, ogunGuncelle, urunBul, urunEkle, turkYemekBul } = useVeri();
 
   const mevcutOgun = id ? ogunler.find((ogun) => ogun.id === id) : undefined;
@@ -68,6 +70,7 @@ export default function OgunDuzenleScreen() {
             protein: m.protein / gram,
             karbonhidrat: m.karbonhidrat / gram,
             yag: m.yag / gram,
+            lif: (m.lif ?? 0) / gram,
           }
         : null;
       return { taban, birim, miktar: String(miktar), isim: mevcutOgun.isim, kalori: String(mevcutOgun.kalori) };
@@ -80,6 +83,7 @@ export default function OgunDuzenleScreen() {
         protein: besin.protein / gram,
         karbonhidrat: besin.karbonhidrat / gram,
         yag: besin.yag / gram,
+        lif: (besin.lif ?? 0) / gram,
       };
       return { taban, birim, miktar: String(miktar), isim: besin.isim, kalori: '' };
     }
@@ -89,6 +93,7 @@ export default function OgunDuzenleScreen() {
         protein: yemek.protein100 / 100,
         karbonhidrat: yemek.karb100 / 100,
         yag: yemek.yag100 / 100,
+        lif: (yemek.lif100 ?? 0) / 100,
       };
       return {
         taban,
@@ -104,6 +109,7 @@ export default function OgunDuzenleScreen() {
         protein: (Number(p100) || 0) / 100,
         karbonhidrat: (Number(c100) || 0) / 100,
         yag: (Number(f100) || 0) / 100,
+        lif: (Number(l100) || 0) / 100,
       };
       return {
         taban,
@@ -121,11 +127,12 @@ export default function OgunDuzenleScreen() {
         protein: yerelUrun.protein / gram,
         karbonhidrat: yerelUrun.karbonhidrat / gram,
         yag: yerelUrun.yag / gram,
+        lif: (yerelUrun.lif ?? 0) / gram,
       };
       return { taban, birim, miktar: String(miktar), isim: yerelUrun.isim, kalori: '' };
     }
     return { taban: null as Taban | null, birim: 'porsiyon' as PorsiyonBirimi, miktar: '1', isim: '', kalori: '' };
-  }, [mevcutOgun, besin, yemek, offKalori100, p100, c100, f100, ad, yerelUrun]);
+  }, [mevcutOgun, besin, yemek, offKalori100, p100, c100, f100, l100, ad, yerelUrun]);
 
   const [isim, setIsim] = useState(baslangic.isim);
   const [birim, setBirim] = useState<PorsiyonBirimi>(baslangic.birim);
@@ -138,6 +145,9 @@ export default function OgunDuzenleScreen() {
     mevcutOgun?.makrolar ? String(mevcutOgun.makrolar.karbonhidrat) : ''
   );
   const [yagMetni, setYagMetni] = useState(mevcutOgun?.makrolar ? String(mevcutOgun.makrolar.yag) : '');
+  const [lifMetni, setLifMetni] = useState(
+    mevcutOgun?.makrolar?.lif != null ? String(mevcutOgun.makrolar.lif) : ''
+  );
 
   const baslangicOgunTuru: OgunTuru = mevcutOgun
     ? mevcutOgun.ogunTuru ?? ogunTuruSaattenTuret(mevcutOgun.eklenmeSaati)
@@ -155,12 +165,14 @@ export default function OgunDuzenleScreen() {
         protein: Math.round(olcekli.protein * gram),
         karbonhidrat: Math.round(olcekli.karbonhidrat * gram),
         yag: Math.round(olcekli.yag * gram),
+        lif: Math.round(olcekli.lif * gram),
       }
     : {
         kalori: Number(kaloriMetni) || 0,
         protein: Number(proteinMetni) || 0,
         karbonhidrat: Number(karbMetni) || 0,
         yag: Number(yagMetni) || 0,
+        lif: Number(lifMetni) || 0,
       };
 
   const gecerli = hesaplanan.kalori > 0 && (Number(miktar) || 0) > 0;
@@ -174,6 +186,7 @@ export default function OgunDuzenleScreen() {
       protein: hesaplanan.protein,
       karbonhidrat: hesaplanan.karbonhidrat,
       yag: hesaplanan.yag,
+      lif: hesaplanan.lif,
       porsiyon: porsiyonEtiketi(birim, Number(miktar) || 0),
     };
 
@@ -192,6 +205,7 @@ export default function OgunDuzenleScreen() {
         protein: hesaplanan.protein,
         karbonhidrat: hesaplanan.karbonhidrat,
         yag: hesaplanan.yag,
+        lif: hesaplanan.lif,
         porsiyon: makrolar.porsiyon,
       });
     }
@@ -276,6 +290,10 @@ export default function OgunDuzenleScreen() {
                     <Text style={stiller.rozetDeger}>{hesaplanan.yag}g</Text>
                     <Text style={stiller.rozetEtiket}>Yağ</Text>
                   </View>
+                  <View style={stiller.rozet}>
+                    <Text style={stiller.rozetDeger}>{hesaplanan.lif}g</Text>
+                    <Text style={stiller.rozetEtiket}>Lif</Text>
+                  </View>
                 </View>
               </View>
             ) : (
@@ -297,6 +315,7 @@ export default function OgunDuzenleScreen() {
                     { etiket: 'Protein', deger: proteinMetni, set: setProteinMetni },
                     { etiket: 'Karb', deger: karbMetni, set: setKarbMetni },
                     { etiket: 'Yağ', deger: yagMetni, set: setYagMetni },
+                    { etiket: 'Lif', deger: lifMetni, set: setLifMetni },
                   ].map((m) => (
                     <View key={m.etiket} style={[stiller.alan, stiller.manuelMakroAlan]}>
                       <Text style={stiller.alanEtiketi}>{m.etiket} (g)</Text>
@@ -411,10 +430,12 @@ const stiller = StyleSheet.create({
   },
   rozetSatiri: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 8,
   },
   rozet: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '22%',
     borderWidth: 1,
     borderColor: ALTIN_COK_SOLUK,
     borderRadius: 12,
@@ -466,10 +487,12 @@ const stiller = StyleSheet.create({
   },
   manuelMakroSatiri: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: 10,
   },
   manuelMakroAlan: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '47%',
   },
   kaydetButonu: {
     flexDirection: 'row',

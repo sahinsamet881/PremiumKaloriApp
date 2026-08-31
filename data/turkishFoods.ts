@@ -19,6 +19,12 @@ export type TurkYemek = {
   protein100: number;
   karb100: number;
   yag100: number;
+  /**
+   * Lif (100 g başına, gram). Şema alanı; mevcut seed kayıtlarında henüz
+   * doldurulmadığı için opsiyonel. Okurken `?? 0` ile ele al. Tam veri
+   * geldiğinde zorunluya çevir ve TURK_YEMEK_VERI_VERSIYONU'nu artır.
+   */
+  lif100?: number;
 };
 
 export const TURK_YEMEK_VERI_VERSIYONU = 1;

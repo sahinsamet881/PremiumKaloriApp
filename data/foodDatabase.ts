@@ -5,6 +5,8 @@ export type YerelBesin = {
   protein: number;
   karbonhidrat: number;
   yag: number;
+  /** Lif (gram). Şema alanı; bu listede henüz doldurulmadı, okurken `?? 0` kullan. */
+  lif?: number;
   porsiyon: string;
   imageUrl: string;
 };

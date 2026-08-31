@@ -79,6 +79,9 @@ describe('TURK_YEMEKLERI_SEED şeması', () => {
       expect(yemek.protein100).toBeGreaterThanOrEqual(0);
       expect(yemek.karb100).toBeGreaterThanOrEqual(0);
       expect(yemek.yag100).toBeGreaterThanOrEqual(0);
+      if (yemek.lif100 != null) {
+        expect(yemek.lif100).toBeGreaterThanOrEqual(0);
+      }
     }
   });
 

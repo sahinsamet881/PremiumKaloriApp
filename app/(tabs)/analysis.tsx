@@ -20,6 +20,7 @@ import {
   SURFACE,
 } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
+import { LIF_HEDEF_ETIKETI, LIF_HEDEF_MAX, LIF_HEDEF_MIN } from '@/nutrition/lif';
 import { haftalikHiz, hedefTahmini, siraliKayitlar, sonKayitlar } from '@/nutrition/kilo';
 
 const BELIRGIN_ASIM_KCAL = 200;
@@ -100,6 +101,24 @@ export default function AnalysisScreen() {
       : 0;
     return { gunSayisi, ortalama, fark: gunSayisi ? ortalama - kullanici.gunlukHedefKalori : 0 };
   }, [ogunGecmisi, kullanici.gunlukHedefKalori]);
+
+  const lifOzeti = useMemo(() => {
+    const esik = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const gunler = new Map<string, number>();
+    for (const kayit of ogunGecmisi) {
+      if (kayit.zaman < esik) {
+        continue;
+      }
+      const gun = new Date(kayit.zaman).toISOString().slice(0, 10);
+      gunler.set(gun, (gunler.get(gun) ?? 0) + (kayit.makrolar?.lif ?? 0));
+    }
+    const degerler = [...gunler.values()];
+    const gunSayisi = degerler.length;
+    const ortalama = gunSayisi
+      ? Math.round(degerler.reduce((a, b) => a + b, 0) / gunSayisi)
+      : 0;
+    return { gunSayisi, ortalama };
+  }, [ogunGecmisi]);
 
   const kilitli = !premiumAktif && aralik !== 4;
 
@@ -326,6 +345,26 @@ export default function AnalysisScreen() {
               </Text>
             </>
           )}
+
+          <View style={stiller.lifSatiri}>
+            <View>
+              <Text style={stiller.lifEtiket}>Lif hedefi</Text>
+              <Text style={stiller.lifDeger}>Günde {LIF_HEDEF_ETIKETI} g</Text>
+            </View>
+            <View style={stiller.lifSagAlan}>
+              <Text
+                style={[
+                  stiller.lifDeger,
+                  lifOzeti.gunSayisi > 0 &&
+                  (lifOzeti.ortalama < LIF_HEDEF_MIN || lifOzeti.ortalama > LIF_HEDEF_MAX)
+                    ? stiller.lifDegerUyari
+                    : null,
+                ]}>
+                {lifOzeti.gunSayisi ? `${lifOzeti.ortalama} g` : '—'}
+              </Text>
+              <Text style={stiller.lifEtiket}>7 gün ort.</Text>
+            </View>
+          </View>
         </View>
       </Animated.ScrollView>
     </View>
@@ -607,5 +646,34 @@ const stiller = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
     backgroundColor: ALTIN,
+  },
+  lifSatiri: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 10,
+    paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: ALTIN_COK_SOLUK,
+  },
+  lifSagAlan: {
+    alignItems: 'flex-end',
+  },
+  lifEtiket: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 11,
+    fontWeight: '300',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginTop: 3,
+  },
+  lifDeger: {
+    color: ALTIN,
+    fontSize: 14,
+    fontWeight: '400',
+    letterSpacing: 0.3,
+  },
+  lifDegerUyari: {
+    color: DANGER,
   },
 });

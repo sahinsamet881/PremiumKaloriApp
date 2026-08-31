@@ -20,6 +20,7 @@ export const CSV_BASLIKLARI = [
   'protein_g',
   'karb_g',
   'yag_g',
+  'lif_g',
   'mililitre',
   'kilo_kg',
   'not',
@@ -39,6 +40,7 @@ export function verileriCsvUret(veri: DisaAktarilacakVeri): string {
       kayit.makrolar ? Math.round(kayit.makrolar.protein) : '',
       kayit.makrolar ? Math.round(kayit.makrolar.karbonhidrat) : '',
       kayit.makrolar ? Math.round(kayit.makrolar.yag) : '',
+      kayit.makrolar?.lif != null ? Math.round(kayit.makrolar.lif) : '',
       '',
       '',
       '',
@@ -46,11 +48,24 @@ export function verileriCsvUret(veri: DisaAktarilacakVeri): string {
   }
 
   for (const kayit of [...veri.suKayitlari].sort((a, b) => a.tarih.localeCompare(b.tarih))) {
-    satirlar.push(['su', kayit.tarih, '', '', '', '', '', '', kayit.mililitre, '', '']);
+    satirlar.push(['su', kayit.tarih, '', '', '', '', '', '', '', kayit.mililitre, '', '']);
   }
 
   for (const kayit of [...veri.kiloKayitlari].sort((a, b) => a.tarih.localeCompare(b.tarih))) {
-    satirlar.push(['kilo', kayit.tarih, '', '', '', '', '', '', '', kayit.kilo, kayit.not ?? '']);
+    satirlar.push([
+      'kilo',
+      kayit.tarih,
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      '',
+      kayit.kilo,
+      kayit.not ?? '',
+    ]);
   }
 
   return satirlar.map((satir) => satir.map(csvHucre).join(',')).join('\n');

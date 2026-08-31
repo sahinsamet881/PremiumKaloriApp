@@ -31,10 +31,14 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
 
 # typescript
 *.tsbuildinfo
+
+# fetch-usda.ts ara çıktısı
+scripts/out/
 
 app-example
 

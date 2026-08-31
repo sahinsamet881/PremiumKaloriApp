@@ -495,6 +495,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           protein: makrolar?.protein ?? 0,
           karbonhidrat: makrolar?.karbonhidrat ?? 0,
           yag: makrolar?.yag ?? 0,
+          lif: makrolar?.lif ?? 0,
         });
       }
       hatirlaticiKur();

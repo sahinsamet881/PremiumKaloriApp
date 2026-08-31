@@ -41,6 +41,8 @@ export type Makrolar = {
   protein: number;
   karbonhidrat: number;
   yag: number;
+  /** Lif (gram). Eski kayıtlarda bulunmayabilir; okurken `?? 0` ile ele al. */
+  lif?: number;
   porsiyon: string;
 };
 
@@ -89,5 +91,7 @@ export type YerelUrun = {
   protein: number;
   karbonhidrat: number;
   yag: number;
+  /** Lif (gram). Eski kayıtlarda bulunmayabilir. */
+  lif?: number;
   porsiyon: string;
 };

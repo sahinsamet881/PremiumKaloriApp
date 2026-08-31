@@ -168,9 +168,10 @@ export default function CoachScreen() {
               p: toplam.p + ogun.makrolar.protein,
               k: toplam.k + ogun.makrolar.karbonhidrat,
               y: toplam.y + ogun.makrolar.yag,
+              l: toplam.l + (ogun.makrolar.lif ?? 0),
             }
           : toplam,
-      { p: 0, k: 0, y: 0 }
+      { p: 0, k: 0, y: 0, l: 0 }
     );
     const ogunListesi =
       ogunler.length > 0
@@ -183,7 +184,7 @@ export default function CoachScreen() {
       '--- KULLANICI ÖZETİ ---',
       `Yaş ${kullanici.yas}, boy ${kullanici.boy} cm, kilo ${kullanici.kilo} kg, hedef kilo ${kullanici.hedefKilo} kg.`,
       `Günlük kalori hedefi: ${kullanici.gunlukHedefKalori} kcal (Protein ${kullanici.makroHedefleri.protein}g / Karbonhidrat ${kullanici.makroHedefleri.karbonhidrat}g / Yağ ${kullanici.makroHedefleri.yag}g).`,
-      `Bugün toplam: ${alinanKalori} kcal — Protein ${Math.round(makro.p)}g, Karbonhidrat ${Math.round(makro.k)}g, Yağ ${Math.round(makro.y)}g.`,
+      `Bugün toplam: ${alinanKalori} kcal — Protein ${Math.round(makro.p)}g, Karbonhidrat ${Math.round(makro.k)}g, Yağ ${Math.round(makro.y)}g, Lif ${Math.round(makro.l)}g (günlük lif hedefi 25–30 g).`,
       `Bugünün öğünleri:\n${ogunListesi}`,
       `Son 7 günün günlük kalori ortalaması: ${
         yediGunKaloriOrt > 0 ? `${yediGunKaloriOrt} kcal` : 'yeterli veri yok'

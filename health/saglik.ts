@@ -13,6 +13,7 @@ export type BeslenmeYazimi = {
   protein: number;
   karbonhidrat: number;
   yag: number;
+  lif: number;
 };
 
 export type SaglikSaglayici = {
