@@ -113,7 +113,7 @@ export default function ModalScreen() {
           <LuksSecenekKarti
             ikon="barcode.viewfinder"
             baslik="Barkod Tara"
-            aciklama="Ambalajlı ürünü kameradan oku"
+            aciklama="Ambalajlı ürünler · veritabanı sürekli genişliyor"
             onPress={() => router.push({ pathname: '/barkod', params: turParam })}
           />
         </View>

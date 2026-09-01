@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
@@ -7,10 +8,14 @@ import { ActivityIndicator, Linking, Pressable, StyleSheet, Text, View } from 'r
 
 import { ALTIN, ALTIN_COK_SOLUK, ALTIN_ORTA_SOLUK, DANGER, SIYAH } from '@/constants/luxTheme';
 import { useVeri } from '@/context/DataContext';
+import { barkodBesinAra } from '@/data/barkodKaynaklari';
 
 type Durum = 'tara' | 'ara' | 'bulunamadi' | 'ag_hatasi';
 
-const OFF_URL = 'https://world.openfoodfacts.org/api/v2/product';
+// onBarcodeScanned kare başına tetiklenir; art arda okumayı bu pencere kadar beklet.
+const TARAMA_ARALIGI_MS = 500;
+
+const ALT_BILGI = 'Ambalajlı ürünler · veritabanı sürekli genişliyor';
 
 export default function BarkodScreen() {
   const [izin, izinIste] = useCameraPermissions();
@@ -19,6 +24,8 @@ export default function BarkodScreen() {
   const [durum, setDurum] = useState<Durum>('tara');
   const [barkod, setBarkod] = useState('');
   const isliyorRef = useRef(false);
+  const sonKodRef = useRef('');
+  const sonZamanRef = useRef(0);
 
   const turParam = grup ? { grup } : {};
 
@@ -28,16 +35,33 @@ export default function BarkodScreen() {
 
   const tekrarTara = () => {
     isliyorRef.current = false;
+    sonKodRef.current = '';
+    sonZamanRef.current = 0;
     setBarkod('');
     setDurum('tara');
   };
 
   const barkodOkundu = async (kod: string, tekrar = false) => {
-    if (isliyorRef.current && !tekrar) {
-      return;
+    const simdi = Date.now();
+    if (!tekrar) {
+      if (isliyorRef.current) {
+        return;
+      }
+      // Aynı barkodu üst üste okuma + genel 500ms throttle.
+      if (kod === sonKodRef.current && simdi - sonZamanRef.current < TARAMA_ARALIGI_MS) {
+        return;
+      }
+      if (simdi - sonZamanRef.current < TARAMA_ARALIGI_MS) {
+        return;
+      }
     }
+
     isliyorRef.current = true;
+    sonKodRef.current = kod;
+    sonZamanRef.current = simdi;
     setBarkod(kod);
+    // Başarılı okumada dokunsal geri bildirim.
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     const yerel = urunBul(kod);
     if (yerel) {
@@ -46,54 +70,31 @@ export default function BarkodScreen() {
     }
 
     setDurum('ara');
+    const sonuc = await barkodBesinAra(kod);
 
-    try {
-      const yanit = await fetch(`${OFF_URL}/${kod}.json`, {
-        headers: { 'User-Agent': 'MinimalistKalori/1.0 (rn)' },
-      });
-
-      if (yanit.status === 404) {
-        setDurum('bulunamadi');
-        return;
-      }
-      if (!yanit.ok) {
-        throw new Error(`HTTP ${yanit.status}`);
-      }
-
-      const veri = await yanit.json();
-      const urun = veri?.product;
-      if (veri?.status === 0 || !urun) {
-        setDurum('bulunamadi');
-        return;
-      }
-
-      const besin = urun.nutriments ?? {};
-      const kalori100 = Number(besin['energy-kcal_100g'] ?? besin['energy-kcal'] ?? 0);
-      if (!Number.isFinite(kalori100) || kalori100 <= 0) {
-        setDurum('bulunamadi');
-        return;
-      }
-
-      const ad =
-        (urun.product_name_tr || urun.product_name || urun.generic_name || '').trim() ||
-        'İsimsiz Ürün';
-
-      router.replace({
-        pathname: '/ogun-duzenle',
-        params: {
-          barkod: kod,
-          ad,
-          k100: String(Math.round(kalori100)),
-          p100: String(Math.round(Number(besin.proteins_100g) || 0)),
-          c100: String(Math.round(Number(besin.carbohydrates_100g) || 0)),
-          f100: String(Math.round(Number(besin.fat_100g) || 0)),
-          l100: String(Math.round(Number(besin.fiber_100g) || 0)),
-          ...turParam,
-        },
-      });
-    } catch {
+    if (sonuc.durum === 'ag_hatasi') {
       setDurum('ag_hatasi');
+      return;
     }
+    if (sonuc.durum === 'bulunamadi') {
+      setDurum('bulunamadi');
+      return;
+    }
+
+    const b = sonuc.besin;
+    router.replace({
+      pathname: '/ogun-duzenle',
+      params: {
+        barkod: kod,
+        ad: b.ad,
+        k100: String(Math.round(b.kalori100)),
+        p100: String(Math.round(b.protein100)),
+        c100: String(Math.round(b.karb100)),
+        f100: String(Math.round(b.yag100)),
+        l100: String(Math.round(b.lif100)),
+        ...turParam,
+      },
+    });
   };
 
   if (!izin) {
@@ -141,14 +142,15 @@ export default function BarkodScreen() {
     return (
       <View style={[stiller.kok, stiller.merkez]}>
         <StatusBar style="light" />
-        <MaterialCommunityIcons name="help-circle-outline" size={60} color={ALTIN} />
-        <Text style={stiller.durumBasligi}>Ürün Bulunamadı</Text>
+        <MaterialCommunityIcons name="plus-box-outline" size={60} color={ALTIN} />
+        <Text style={stiller.durumBasligi}>Bu Ürünü Henüz Tanımıyoruz</Text>
         <Text style={stiller.aciklama}>
-          {barkod} numaralı barkod Open Food Facts&apos;ta kayıtlı değil. Bilgileri elle girebilirsin;
-          girdiğin ürün cihazına kaydedilir ve bir dahaki taramada hazır olur.
+          Ambalajlı ürünlerin çoğu kayıtlı ama hepsi değil. Bu ürünün bilgilerini sen gir; cihazına
+          barkoduyla kaydedelim, bir dahaki taramada anında gelsin.
         </Text>
+        <Text style={stiller.durumMetni}>{barkod}</Text>
         <Pressable onPress={() => elleGir(barkod)} style={stiller.anaButon}>
-          <Text style={stiller.anaButonYazisi}>Elle Gir</Text>
+          <Text style={stiller.anaButonYazisi}>Ürünü Ekle</Text>
         </Pressable>
         <Pressable onPress={tekrarTara} hitSlop={10}>
           <Text style={stiller.ikincilYazi}>Tekrar Tara</Text>
@@ -183,7 +185,9 @@ export default function BarkodScreen() {
       <CameraView
         style={StyleSheet.absoluteFillObject}
         facing="back"
-        barcodeScannerSettings={{ barcodeTypes: ['ean13', 'ean8'] }}
+        barcodeScannerSettings={{
+          barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128'],
+        }}
         onBarcodeScanned={({ data }) => barkodOkundu(data)}
       />
       <View style={stiller.katman} pointerEvents="box-none">
@@ -194,6 +198,7 @@ export default function BarkodScreen() {
           <View style={[stiller.kose, stiller.koseSolAlt]} />
           <View style={[stiller.kose, stiller.koseSagAlt]} />
         </View>
+        <Text style={stiller.altBilgi}>{ALT_BILGI}</Text>
         <Pressable onPress={() => router.back()} style={stiller.kapatButonu} hitSlop={10}>
           <Text style={stiller.ikincilYazi}>Kapat</Text>
         </Pressable>
@@ -306,6 +311,14 @@ const stiller = StyleSheet.create({
     borderBottomWidth: 3,
     borderRightWidth: 3,
     borderBottomRightRadius: 12,
+  },
+  altBilgi: {
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 12,
+    fontWeight: '300',
+    letterSpacing: 0.4,
+    textAlign: 'center',
+    paddingHorizontal: 24,
   },
   kapatButonu: {
     borderWidth: 1,

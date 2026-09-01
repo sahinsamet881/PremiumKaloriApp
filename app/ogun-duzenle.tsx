@@ -159,6 +159,16 @@ export default function OgunDuzenleScreen() {
   const olcekli = baslangic.taban;
   const gram = Math.max(0, (Number(miktar) || 0) * birimGram(birim));
 
+  const barkodNotu = !barkod
+    ? null
+    : duzenlemeMi
+      ? null
+      : yerelUrun
+        ? `Cihazına kayıtlı ürün · ${barkod}`
+        : offKalori100 > 0
+          ? `${barkod} · kaydettiğinde bir dahaki taramada hazır olacak`
+          : `Yeni ürün · ${barkod}\nBilgileri gir; cihazına kaydedip bir dahaki taramada anında getirelim.`;
+
   const hesaplanan = olcekli
     ? {
         kalori: Math.round(olcekli.kalori * gram),
@@ -234,6 +244,13 @@ export default function OgunDuzenleScreen() {
             contentContainerStyle={stiller.icerik}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
+            {barkodNotu ? (
+              <View style={stiller.barkodNotu}>
+                <MaterialCommunityIcons name="barcode" size={16} color={ALTIN_ORTA_SOLUK} />
+                <Text style={stiller.barkodNotuYazi}>{barkodNotu}</Text>
+              </View>
+            ) : null}
+
             <View style={stiller.alan}>
               <Text style={stiller.alanEtiketi}>Yemek Adı</Text>
               <TextInput
@@ -380,6 +397,26 @@ const stiller = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 24,
     gap: 22,
+  },
+  barkodNotu: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: -8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: ALTIN_COK_SOLUK,
+    backgroundColor: SURFACE,
+  },
+  barkodNotuYazi: {
+    flex: 1,
+    color: ALTIN_ORTA_SOLUK,
+    fontSize: 12,
+    fontWeight: '300',
+    lineHeight: 17,
+    letterSpacing: 0.3,
   },
   alan: {
     gap: 8,
